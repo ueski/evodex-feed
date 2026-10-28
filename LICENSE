@@ -1,0 +1,44 @@
+MIT License
+
+Copyright (c) 2026 ueski
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---------------------------------------------------------------------------
+
+SCOPE: THIS LICENSE COVERS THE CODE ONLY, NOT THE DATA.
+
+The MIT license above applies to the source code in this repository (the
+Python pipeline, scripts and workflow). It does not cover, and grants no rights
+to, any data the code downloads or publishes, including everything in the
+generated feed (index.json, prices*.json, history/, daily/, manifest.json) and
+on the `data` branch:
+
+* Prices are TCGplayer market data, obtained through TCGCSV (https://tcgcsv.com).
+  They belong to TCGplayer.
+* Card data comes from TCGdex (https://tcgdex.dev). Card names, card text, set
+  names, artwork and images are (c) Nintendo, Creatures, GAME FREAK and The
+  Pokémon Company, or their other respective owners.
+* Fallback image URLs point to pokemontcg.io / Scrydex and TCGplayer, and
+  species data comes from PokéAPI; those remain their owners' terms.
+
+Pokémon is a trademark of Nintendo, Creatures, GAME FREAK and The Pokémon
+Company. Evodex and this repository are unofficial and are not affiliated
+with, endorsed, sponsored or approved by any of the companies or projects
+named above.

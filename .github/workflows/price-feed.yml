@@ -1,0 +1,163 @@
+# Daily Evodex price feed: TCGdex + TCGCSV -> pipeline/ -> static JSON on GitHub Pages.
+#
+# Schedule: 21:15 UTC. TCGCSV publishes its TCGplayer dump at about 20:05 UTC. `check`
+# compares TCGCSV's last-updated.txt with the previous feed; on a scheduled run it polls
+# every 15 min for up to 2 h while today's build is late. Same build = nothing to do.
+#
+# State: manifest.json + history/ + daily/ live on the `data` branch (scripts/state.sh,
+# README "History and state"). A run reads that state, folds today in, validates the result,
+# pushes the new state and only then deploys. Any failure before that point stops the run:
+# nothing is pushed or deployed, and yesterday's feed stays live.
+name: Price feed
+
+on:
+  schedule:
+    - cron: "15 21 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Rebuild even if the feed already has TCGCSV's current build"
+        type: boolean
+        default: false
+      allow_shrink:
+        description: "Publish even if cards, products or history shrank sharply (read the failed run's log first)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# One run at a time; a run that starts while another is going waits for it.
+concurrency:
+  group: price-feed
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 210        # up to 120 min waiting for a late TCGCSV build + a cold ~35 min pipeline run
+    permissions:
+      contents: write           # push the data branch
+      pages: read               # configure-pages reads the site URL
+      actions: write            # keep the schedule enabled (last step)
+    outputs:
+      changed: ${{ steps.check.outputs.changed }}
+    env:
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Unit tests
+        working-directory: pipeline
+        run: python3 -m unittest -q
+
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Load the previous feed (data branch)
+        id: state
+        env:
+          FEED_URL: ${{ steps.pages.outputs.base_url }}
+        run: scripts/state.sh pull state "$FEED_URL/"
+
+      - name: Check for a new TCGCSV build
+        id: check
+        env:
+          PREVIOUS: ${{ steps.state.outputs.previous }}
+          FORCE: ${{ inputs.force && '--force' || '' }}
+          WAIT_MINUTES: ${{ github.event_name == 'schedule' && '120' || '0' }}
+        run: |
+          # shellcheck disable=SC2086  # FORCE is one flag or nothing
+          python3 pipeline/publish_feed.py check --previous "$PREVIOUS" --wait-minutes "$WAIT_MINUTES" --poll-minutes 15 $FORCE
+
+      - name: Restore the HTTP cache
+        if: steps.check.outputs.changed == 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: pipeline/cache
+          key: pipeline-cache-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: pipeline-cache-
+
+      # TCGCSV: sequential, 150 ms apart, one sync per build. TCGdex: 4 workers, <= ~13 req/s,
+      # cards re-fetched after 14 days. A warm run makes a few hundred requests in total.
+      - name: Run the data pipeline
+        if: steps.check.outputs.changed == 'true'
+        run: python3 pipeline/run.py --workers 4
+
+      - name: Prune old TCGCSV builds from the cache (history lives on the data branch)
+        if: always() && steps.check.outputs.changed == 'true'
+        run: |
+          python3 - <<'EOF'
+          import glob, shutil
+          builds = sorted(glob.glob("pipeline/cache/tcgcsv/20*/"))
+          for d in builds[:-2]:
+              shutil.rmtree(d)
+          print("kept TCGCSV builds:", builds[-2:])
+          EOF
+
+      - name: Save the HTTP cache
+        if: always() && steps.check.outputs.changed == 'true' && hashFiles('pipeline/cache/tcgcsv/last-updated.txt') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: pipeline/cache
+          key: pipeline-cache-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Build the feed (fold today into the previous feed)
+        if: steps.check.outputs.changed == 'true'
+        env:
+          PREVIOUS: ${{ steps.state.outputs.previous }}
+          SHRINK: ${{ inputs.allow_shrink && '--allow-shrink' || '' }}
+        run: |
+          # shellcheck disable=SC2086  # SHRINK is one flag or nothing
+          python3 pipeline/publish_feed.py build --bundle pipeline/out/bundle --out site --previous "$PREVIOUS" $SHRINK
+
+      - name: Validate (sha256, sizes, 90 % product guard, history carried over)
+        if: steps.check.outputs.changed == 'true'
+        env:
+          PREVIOUS: ${{ steps.state.outputs.previous }}
+          SHRINK: ${{ inputs.allow_shrink && '--allow-shrink' || '' }}
+        run: |
+          # shellcheck disable=SC2086  # SHRINK is one flag or nothing
+          python3 pipeline/validate_feed.py site --previous "$PREVIOUS" $SHRINK
+
+      - name: Save the new state (push the data branch)
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          build="$(python3 -c 'import json; print(json.load(open("site/manifest.json"))["tcgcsvBuild"])')"
+          scripts/state.sh push site "Feed $build (run ${{ github.run_id }})"
+
+      - name: Upload the site
+        if: steps.check.outputs.changed == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      # GitHub disables scheduled workflows in repositories without activity for 60 days.
+      # Re-enabling the (enabled) workflow every day resets that clock. Best effort.
+      - name: Keep the schedule enabled
+        if: always() && github.event_name == 'schedule'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/price-feed.yml/enable"
+
+  deploy:
+    needs: build
+    if: needs.build.result == 'success' && needs.build.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

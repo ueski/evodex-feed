@@ -1,0 +1,8 @@
+# Build products and caches (never committed; the feed's state lives on the `data` branch)
+/site/
+/state/
+pipeline/out/
+pipeline/cache/
+__pycache__/
+*.pyc
+.DS_Store

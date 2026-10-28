@@ -157,7 +157,7 @@ THUMBNAIL_SUFFIXES = (("_hires.png", ".png"),               # images.pokemontcg.
 
 def thumbnail_url(url):
     """Smaller variant of a fallback URL for grids (the rule the app applies,
-    docs/architecture/data-sources.md "Fallback images"); unknown shapes are
+    data-sources.md in the Evodex app repository "Fallback images"); unknown shapes are
     returned unchanged."""
     for large, small in THUMBNAIL_SUFFIXES:
         if url.endswith(large):

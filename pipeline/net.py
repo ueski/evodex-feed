@@ -20,7 +20,7 @@ import time
 import urllib.error
 import urllib.request
 
-USER_AGENT = "BinderlyPipeline/0.1 (Binderly iOS data pipeline; stdlib urllib)"
+USER_AGENT = "EvodexFeed/1.0 (+https://github.com/ueski/evodex-feed; daily price feed; stdlib urllib)"
 
 
 class NotFound(Exception):

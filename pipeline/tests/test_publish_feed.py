@@ -1,3 +1,4 @@
+import datetime
 import gzip
 import hashlib
 import json
@@ -253,6 +254,43 @@ class BuildFeedTests(unittest.TestCase):
         with self.assertRaises(publish_feed.PublishError):
             publish_feed.build_feed(b, self.path("out"), publish_feed.NoPrevious())
 
+    def test_manifest_counts_price_products_and_rows(self):
+        publish_feed.build_feed(self.day1(), self.path("feed"), publish_feed.NoPrevious())
+        m = read(self.path("feed", "manifest.json"))
+        self.assertEqual(m["prices"]["products"], 3)
+        self.assertEqual(m["prices"]["rows"], 3)
+
+    def test_refuses_when_products_drop_below_90_percent(self):
+        many = {str(1000 + i): [[0, 100 + i, None, None, None, None]] for i in range(20)}
+        cards = CARDS + [{"s": "sv03.5", "l": str(i), "n": "C%d" % i, "p": [{"id": 1000 + i, "st": [0]}]}
+                         for i in range(20)]
+        feed1 = self.path("feed1")
+        publish_feed.build_feed(make_bundle(self.path("b1"), "2026-10-21T20:05:22+0000", cards, many),
+                                feed1, publish_feed.NoPrevious())
+        fewer = dict(list(many.items())[:17])          # 85 % of the products, same catalog
+        b2 = make_bundle(self.path("b2"), "2026-10-22T20:05:22+0000", cards, fewer)
+        with self.assertRaises(publish_feed.PublishError) as ctx:
+            publish_feed.build_feed(b2, self.path("out"), publish_feed.DirPrevious(feed1))
+        self.assertIn("products", str(ctx.exception))
+        self.assertFalse(os.path.exists(self.path("out")))
+        ok = dict(list(many.items())[:18])             # 90 % is fine
+        b3 = make_bundle(self.path("b3"), "2026-10-22T20:05:22+0000", cards, ok)
+        publish_feed.build_feed(b3, self.path("out"), publish_feed.DirPrevious(feed1), allow_shrink=False)
+
+    def test_refuses_when_previous_history_files_are_missing(self):
+        sets = ["s%02d" % i for i in range(10)]
+        cards = [{"s": s, "l": "1", "n": "X", "p": [{"id": 100 + i, "st": [0]}]} for i, s in enumerate(sets)]
+        prices = {str(100 + i): [[0, 5, None, None, None, None]] for i in range(10)}
+        feed1 = self.path("feed1")
+        publish_feed.build_feed(make_bundle(self.path("b1"), "2026-10-21T20:05:22+0000", cards, prices),
+                                feed1, publish_feed.NoPrevious())
+        for s in sets[:3]:
+            os.remove(os.path.join(feed1, "history", s + ".json"))
+        b2 = make_bundle(self.path("b2"), "2026-10-22T20:05:22+0000", cards, prices)
+        with self.assertRaises(publish_feed.PublishError) as ctx:
+            publish_feed.build_feed(b2, self.path("out"), publish_feed.DirPrevious(feed1))
+        self.assertIn("history files", str(ctx.exception))
+
     def test_summary_reports_gzip_sizes(self):
         summary = publish_feed.build_feed(self.day1(), self.path("feed"), publish_feed.NoPrevious())
         blob = read(self.path("feed", "prices.json"), binary=True)
@@ -262,23 +300,89 @@ class BuildFeedTests(unittest.TestCase):
 
 
 class CheckTests(unittest.TestCase):
-    def run_check(self, live_manifest, stamp, force=False):
-        class FakeLive:
-            def __init__(self, url):
-                self.manifest = live_manifest
-        original = publish_feed.UrlPrevious
-        publish_feed.UrlPrevious = FakeLive
-        try:
-            return publish_feed.check("https://example.invalid/", force=force, tcgcsv_stamp=stamp)[0]
-        finally:
-            publish_feed.UrlPrevious = original
+    NOW = datetime.datetime(2026, 10, 22, 21, 15, tzinfo=datetime.timezone.utc)
+
+    def run_check(self, prev_manifest, stamp, force=False, **kw):
+        return publish_feed.check(prev_manifest, force=force, tcgcsv_stamp=stamp, now=lambda: self.NOW, **kw)[0]
 
     def test_changed_rules(self):
-        live = {"v": 1, "tcgcsvBuild": "2026-10-21T20:05:22+0000"}
-        self.assertFalse(self.run_check(live, "2026-10-21T20:05:22+0000"))
-        self.assertTrue(self.run_check(live, "2026-10-22T20:03:00+0000"))
+        prev = {"v": 1, "tcgcsvBuild": "2026-10-21T20:05:22+0000"}
+        self.assertFalse(self.run_check(prev, "2026-10-21T20:05:22+0000"))
+        self.assertTrue(self.run_check(prev, "2026-10-22T20:03:00+0000"))
         self.assertTrue(self.run_check(None, "2026-10-21T20:05:22+0000"))
-        self.assertTrue(self.run_check(live, "2026-10-21T20:05:22+0000", force=True))
+        self.assertTrue(self.run_check(prev, "2026-10-21T20:05:22+0000", force=True))
+
+    def test_waits_for_a_late_build(self):
+        prev = {"v": 1, "tcgcsvBuild": "2026-10-21T20:05:22+0000"}
+        stamps = iter(["2026-10-21T20:05:22+0000", "2026-10-22T21:40:00+0000"])
+        slept = []
+        changed, _, stamp = publish_feed.check(prev, tcgcsv_stamp="2026-10-21T20:05:22+0000",
+                                               wait_seconds=7200, poll_seconds=900,
+                                               stamp_fn=lambda: next(stamps), sleep=slept.append,
+                                               now=lambda: self.NOW)
+        self.assertTrue(changed)
+        self.assertEqual(stamp, "2026-10-22T21:40:00+0000")
+        self.assertEqual(slept, [900, 900])
+
+    def test_gives_up_after_the_wait(self):
+        prev = {"v": 1, "tcgcsvBuild": "2026-10-21T20:05:22+0000"}
+        slept = []
+        changed, _, _ = publish_feed.check(prev, tcgcsv_stamp="2026-10-21T20:05:22+0000",
+                                           wait_seconds=3600, poll_seconds=900,
+                                           stamp_fn=lambda: "2026-10-21T20:05:22+0000",
+                                           sleep=slept.append, now=lambda: self.NOW)
+        self.assertFalse(changed)
+        self.assertEqual(sum(slept), 3600)
+
+    def test_no_wait_when_todays_build_is_already_published(self):
+        prev = {"v": 1, "tcgcsvBuild": "2026-10-22T20:05:22+0000"}
+        slept = []
+        changed, _, _ = publish_feed.check(prev, tcgcsv_stamp="2026-10-22T20:05:22+0000",
+                                           wait_seconds=7200, stamp_fn=lambda: self.fail("polled"),
+                                           sleep=slept.append, now=lambda: self.NOW)
+        self.assertFalse(changed)
+        self.assertEqual(slept, [])
+
+    def test_previous_dir_is_the_state(self):
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp)
+        with open(os.path.join(tmp, "manifest.json"), "w") as f:
+            json.dump({"v": 1, "tcgcsvBuild": "2026-10-22T20:05:22+0000"}, f)
+        args = publish_feed.argparse.Namespace(previous_url=None, previous_dir=tmp)
+        manifest = publish_feed.previous_state(args).manifest
+        self.assertFalse(self.run_check(manifest, "2026-10-22T20:05:22+0000"))
+        empty = publish_feed.previous_state(publish_feed.argparse.Namespace(previous_url=None, previous_dir=None))
+        self.assertIsNone(empty.manifest)
+
+
+class PreviousSpecTests(unittest.TestCase):
+    def ns(self, previous=None, url=None, folder=None):
+        return publish_feed.argparse.Namespace(previous=previous, previous_url=url, previous_dir=folder)
+
+    def test_spec_is_url_dir_or_nothing(self):
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp)
+        with open(os.path.join(tmp, "manifest.json"), "w") as f:
+            json.dump({"v": 1, "tcgcsvBuild": "2026-10-22T20:05:22+0000"}, f)
+        self.assertIsInstance(publish_feed.previous_state(self.ns(tmp)), publish_feed.DirPrevious)
+        self.assertIsInstance(publish_feed.previous_state(self.ns("")), publish_feed.NoPrevious)
+        self.assertIsInstance(publish_feed.previous_state(self.ns()), publish_feed.NoPrevious)
+        original = publish_feed.UrlPrevious
+        publish_feed.UrlPrevious = lambda url: ("url", url)
+        try:
+            self.assertEqual(publish_feed.previous_state(self.ns("https://x.invalid/")), ("url", "https://x.invalid/"))
+        finally:
+            publish_feed.UrlPrevious = original
+        with self.assertRaises(publish_feed.PublishError):
+            publish_feed.previous_state(self.ns(tmp, folder=tmp))
+
+    def test_a_directory_without_manifest_is_an_error_not_a_first_run(self):
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp)
+        with self.assertRaises(publish_feed.PublishError):
+            publish_feed.DirPrevious(tmp)
+        with self.assertRaises(publish_feed.PublishError):
+            publish_feed.DirPrevious(os.path.join(tmp, "missing"))
 
 
 class StampTests(unittest.TestCase):

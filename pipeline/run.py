@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Regenerate every Binderly data output into tools/pipeline/out/.
+"""Regenerate every Evodex data output into pipeline/out/.
 
-    python3 tools/pipeline/run.py              # normal run (uses + refreshes cache)
-    python3 tools/pipeline/run.py --offline    # cache only, no network
-    python3 tools/pipeline/run.py --sets sv03.5,base1   # quick partial run
-    python3 tools/pipeline/run.py --offline --online-aux
+    python3 pipeline/run.py              # normal run (uses + refreshes cache)
+    python3 pipeline/run.py --offline    # cache only, no network
+    python3 pipeline/run.py --sets sv03.5,base1   # quick partial run
+    python3 pipeline/run.py --offline --online-aux
         # catalog + prices from the cache; auxiliary sources (pokemontcg.io,
         # image HEAD checks, PokéAPI) refreshed. --online-images is an alias.
 
@@ -724,7 +724,7 @@ def coverage(physical, cards_out, set_meta, series_name):
 def render_report(summary, cov, map_report, set_meta):
     L = []
     a = L.append
-    a("# Binderly data pipeline report\n")
+    a("# Evodex data pipeline report\n")
     a("Generated %s from TCGCSV build %s.\n" % (summary["generatedAt"], summary["tcgcsvBuild"]))
     t, c = summary["tcgdex"], summary["tcgcsv"]
     a("TCGdex: %d sets (%d physical, %d TCG Pocket excluded), %d cards. "

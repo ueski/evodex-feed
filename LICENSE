@@ -35,8 +35,9 @@ on the `data` branch:
 * Card data comes from TCGdex (https://tcgdex.dev). Card names, card text, set
   names, artwork and images are (c) Nintendo, Creatures, GAME FREAK and The
   Pokémon Company, or their other respective owners.
-* Fallback image URLs point to pokemontcg.io / Scrydex and TCGplayer, and
-  species data comes from PokéAPI; those remain their owners' terms.
+* Fallback image URLs point to pokemontcg.io / Scrydex (no TCGplayer images
+  are used), and species data comes from PokéAPI; those remain their owners'
+  terms.
 
 Pokémon is a trademark of Nintendo, Creatures, GAME FREAK and The Pokémon
 Company. Evodex and this repository are unofficial and are not affiliated

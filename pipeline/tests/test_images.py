@@ -121,42 +121,42 @@ class MatchCardsTests(unittest.TestCase):
         self.assertEqual(images.large_image(ptcg("a-1", "1", "X", large=False)), "https://images.pokemontcg.io/a/1.png")
 
 
-class TcgplayerUrlTests(unittest.TestCase):
-    def test_rewrites_tcgcsv_image_url_to_the_1000px_variant(self):
-        self.assertEqual(images.tcgplayer_large("https://tcgplayer-cdn.tcgplayer.com/product/264210_200w.jpg"),
-                         "https://tcgplayer-cdn.tcgplayer.com/product/264210_in_1000x1000.jpg")
-        self.assertEqual(images.tcgplayer_large("https://tcgplayer-cdn.tcgplayer.com/product/264210_in_800x800.jpg"),
-                         "https://tcgplayer-cdn.tcgplayer.com/product/264210_in_1000x1000.jpg")
-
-    def test_falls_back_to_the_product_id(self):
-        self.assertEqual(images.tcgplayer_large(None, 654594),
-                         "https://tcgplayer-cdn.tcgplayer.com/product/654594_in_1000x1000.jpg")
-        self.assertEqual(images.tcgplayer_large("https://example.com/x.jpg", 1),
-                         "https://tcgplayer-cdn.tcgplayer.com/product/1_in_1000x1000.jpg")
-        self.assertIsNone(images.tcgplayer_large(None, None))
-
+class ThumbnailAndHostTests(unittest.TestCase):
     def test_thumbnail_rule(self):
         self.assertEqual(images.thumbnail_url("https://images.pokemontcg.io/swsh9tg/TG01_hires.png"),
                          "https://images.pokemontcg.io/swsh9tg/TG01.png")
-        self.assertEqual(images.thumbnail_url("https://tcgplayer-cdn.tcgplayer.com/product/1_in_1000x1000.jpg"),
-                         "https://tcgplayer-cdn.tcgplayer.com/product/1_200w.jpg")
         self.assertEqual(images.thumbnail_url("https://images.scrydex.com/pokemon/me55c-58/large"),
                          "https://images.scrydex.com/pokemon/me55c-58/small")
         self.assertEqual(images.thumbnail_url("https://example.com/a.png"), "https://example.com/a.png")
 
+    def test_only_pokemontcgio_and_scrydex_are_allowed(self):
+        """v0.3 IP decision: TCGplayer's product photos are no longer a source (research.md §3.4)."""
+        self.assertEqual(images.SOURCES, ("ptcgio",))
+        self.assertTrue(images.allowed("https://images.pokemontcg.io/a/1_hires.png"))
+        self.assertTrue(images.allowed("https://images.scrydex.com/pokemon/me55c-58/large"))
+        self.assertFalse(images.allowed("https://tcgplayer-cdn.tcgplayer.com/product/1_in_1000x1000.jpg"))
+        self.assertFalse(images.allowed("http://images.pokemontcg.io/a/1_hires.png"))
+        self.assertFalse(images.allowed(None))
+        self.assertFalse(hasattr(images, "tcgplayer_large"))
+
 
 class ChooseTests(unittest.TestCase):
-    A, B = "https://images.pokemontcg.io/a/1_hires.png", "https://tcgplayer-cdn.tcgplayer.com/product/1_in_1000x1000.jpg"
+    A, B = "https://images.pokemontcg.io/a/1_hires.png", "https://images.scrydex.com/pokemon/me55c-4/large"
+    TCGP = "https://tcgplayer-cdn.tcgplayer.com/product/1_in_1000x1000.jpg"
 
     def test_order_and_head_status(self):
-        cands = [("ptcgio", self.A), ("tcgplayer", self.B)]
+        cands = [("ptcgio", self.A), ("ptcgio", self.B)]
         self.assertEqual(images.choose(cands, {self.A: 200, self.B: 200}.get), ("ptcgio", self.A))
-        self.assertEqual(images.choose(cands, {self.A: 404, self.B: 200}.get), ("tcgplayer", self.B))
+        self.assertEqual(images.choose(cands, {self.A: 404, self.B: 200}.get), ("ptcgio", self.B))
         self.assertEqual(images.choose(cands, {self.A: 404, self.B: 403}.get), (None, None))
 
     def test_unchecked_url_is_accepted_and_missing_candidates_skipped(self):
-        self.assertEqual(images.choose([("ptcgio", None), ("tcgplayer", self.B)], {}.get), ("tcgplayer", self.B))
-        self.assertEqual(images.choose([("ptcgio", None), ("tcgplayer", None)], {}.get), (None, None))
+        self.assertEqual(images.choose([("ptcgio", None), ("ptcgio", self.B)], {}.get), ("ptcgio", self.B))
+        self.assertEqual(images.choose([("ptcgio", None)], {}.get), (None, None))
+
+    def test_a_host_off_the_allow_list_is_never_chosen(self):
+        self.assertEqual(images.choose([("other", self.TCGP)], {self.TCGP: 200}.get), (None, None))
+        self.assertEqual(images.choose([("other", self.TCGP), ("ptcgio", self.A)], {}.get), ("ptcgio", self.A))
 
 
 class BundleFallbackFieldTests(unittest.TestCase):

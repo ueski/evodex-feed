@@ -2,16 +2,18 @@
 
 TCGdex has no image for about 7.6 % of the catalog (all Trainer Gallery,
 Galarian Gallery and Shiny Vault cards, MEP promos, trainer kits ...). For
-those cards only, the pipeline looks for another absolute image URL, in order:
+those cards only, the pipeline looks for another absolute image URL:
 
-  a) pokemontcg.io  ``images.large`` (``https://images.pokemontcg.io/<set>/<n>_hires.png``,
+  pokemontcg.io  ``images.large`` (``https://images.pokemontcg.io/<set>/<n>_hires.png``,
      734 x 1024 PNG; the newest sets use ``https://images.scrydex.com/pokemon/<id>/large``,
      654 x 914 PNG, because pokemontcg.io is run by Scrydex); the card is found
      by set mapping + number + name.
-  b) TCGplayer      the primary product's image from TCGCSV ``imageUrl``,
-     rewritten to the 1000 px variant
-     (``https://tcgplayer-cdn.tcgplayer.com/product/<productId>_in_1000x1000.jpg``,
-     about 720 x 1000 JPEG).
+
+Until 2026-10-29 TCGplayer's own product photos (tcgplayer-cdn.tcgplayer.com)
+were a second source. They were dropped for IP reasons: TCGplayer's terms bar
+using its content elsewhere without written permission, so TCGplayer is
+credited for prices only. Only ``ALLOWED_HOSTS`` may appear in ``im``
+(validate_feed.py rejects a feed with any other host).
 
 Every chosen URL is HEAD-checked once (run.py, cached in
 ``cache/images/status.json``); a URL that does not answer 200 is skipped and
@@ -38,8 +40,8 @@ from collections import defaultdict
 from normalize import name_similarity, number_key, set_name_key, set_name_similarity
 
 PTCGIO_IMAGE_HOSTS = ("images.pokemontcg.io", "images.scrydex.com")
-TCGPLAYER_IMAGE_HOST = "tcgplayer-cdn.tcgplayer.com"
-SOURCES = ("ptcgio", "tcgplayer")
+ALLOWED_HOSTS = PTCGIO_IMAGE_HOSTS      # the only hosts an "im" URL may use (the app allow-lists the same)
+SOURCES = ("ptcgio",)
 MIN_NAME = 0.5
 
 _PT_RE = re.compile(r"(\d)pt(\d)")
@@ -134,24 +136,7 @@ def match_cards(cards, ptcg_cards):
     return out
 
 
-_TCGP_SIZE_RE = re.compile(r"_(?:\d+w|in_\d+x\d+)\.jpg$")
-
-
-def tcgplayer_large(image_url=None, product_id=None):
-    """TCGCSV ``imageUrl`` (".../product/264210_200w.jpg") -> the 1000 px
-    variant (".../product/264210_in_1000x1000.jpg"). Built from the
-    productId when the URL is missing or has an unknown shape."""
-    if image_url:
-        u = urllib.parse.urlparse(image_url)
-        if u.netloc == TCGPLAYER_IMAGE_HOST and _TCGP_SIZE_RE.search(u.path):
-            return "https://%s%s" % (TCGPLAYER_IMAGE_HOST, _TCGP_SIZE_RE.sub("_in_1000x1000.jpg", u.path))
-    if product_id is not None:
-        return "https://%s/product/%d_in_1000x1000.jpg" % (TCGPLAYER_IMAGE_HOST, int(product_id))
-    return None
-
-
 THUMBNAIL_SUFFIXES = (("_hires.png", ".png"),               # images.pokemontcg.io, 245 x 342
-                      ("_in_1000x1000.jpg", "_200w.jpg"),    # tcgplayer-cdn, 200 x 278
                       ("/large", "/small"))                  # images.scrydex.com, 245 x 342
 
 
@@ -165,12 +150,18 @@ def thumbnail_url(url):
     return url
 
 
+def allowed(url):
+    """True for an https URL on one of ``ALLOWED_HOSTS``."""
+    u = urllib.parse.urlparse(url or "")
+    return u.scheme == "https" and u.netloc in ALLOWED_HOSTS
+
+
 def choose(candidates, status):
     """candidates: [(source, url | None)] in preference order; status(url) ->
     HTTP status, or None when it was never checked. Returns (source, url) of
-    the first URL that is 200 (or unchecked), else (None, None)."""
+    the first allowed URL (``allowed``) that is 200 (or unchecked), else (None, None)."""
     for source, url in candidates:
-        if not url:
+        if not url or not allowed(url):
             continue
         code = status(url)
         if code is None or code == 200:

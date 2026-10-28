@@ -19,9 +19,9 @@ no app code here.
 
 | What | Source | Notes |
 |---|---|---|
-| Prices (market, low, mid, high, direct low; USD) | **TCGplayer**, via [TCGCSV](https://tcgcsv.com) | TCGCSV mirrors TCGplayer's catalog and prices once a day. The prices are TCGplayer's data. Thank you, TCGCSV. |
+| Prices (market, low, mid, high, direct low; USD) | **TCGplayer**, via [TCGCSV](https://tcgcsv.com) | TCGCSV mirrors TCGplayer's catalog and prices once a day. The prices are TCGplayer's data. TCGplayer is credited for **prices only**: no TCGplayer images are used. Thank you, TCGCSV. |
 | Cards, sets, numbers, rarities, image URLs | [TCGdex](https://tcgdex.dev) (`api.tcgdex.net`) | Open-source card database. Thank you, TCGdex. |
-| Fallback image URLs (cards TCGdex has no image for) | [pokemontcg.io](https://pokemontcg.io) / Scrydex, TCGplayer CDN | URLs only; no images are stored here. |
+| Fallback image URLs (cards TCGdex has no image for) | [pokemontcg.io](https://pokemontcg.io) / Scrydex **only** (`images.pokemontcg.io`, `images.scrydex.com`) | URLs only; no images are stored here. Cards neither TCGdex nor pokemontcg.io has an image for get none. |
 | National Dex species per card (`dx`) | [PokéAPI](https://pokeapi.co) static CSV export | Read at most every 30 days from GitHub, never from the REST API. |
 
 **Notice.** Pokémon and all card names, card text, set names, artwork and images are © Nintendo,
@@ -74,6 +74,7 @@ will be uploaded. Either one failing stops the run:
 | TCGCSV build not older than the previous feed's | Never go back in time. |
 | History carried over: no fewer days, no lost daily snapshots, no lost history files | A run that lost its state would otherwise publish a feed with its history wiped. |
 | First run: ≥ 15,000 cards and ≥ 15,000 products | There is nothing to compare the first day with. |
+| Fallback images (`im` in `index.json`) only on `images.pokemontcg.io` / `images.scrydex.com`; any `tcgplayer-cdn.tcgplayer.com` URL fails the run | TCGplayer images are not used (IP decision); TCGplayer is a price source only. |
 | `daily/` and `history/` match the manifest exactly; every series as long as its dates; no file > 100 MB, site < 1 GB | Structural integrity and GitHub Pages limits. |
 
 After checking what changed, a shrink can be accepted once with **Run workflow → allow_shrink**.
@@ -142,13 +143,13 @@ response carries an `ETag`. Sizes are from the local run of 2026-10-28 (TCGCSV b
 | Path | What | Raw | gzip -6 (≈ as served) |
 |---|---|---:|---:|
 | `manifest.json` | The only file the app polls (`If-None-Match`) | 757 B | 424 B |
-| `index.json` | Catalog: 21,290 cards, 205 sets | 2.9 MB | 480 KB |
+| `index.json` | Catalog: 21,290 cards, 205 sets | 2.9 MB | 476 KB |
 | `prices.json` | Latest prices, 5 fields: 22,305 products, 36,130 rows | 1.1 MB | 338 KB |
 | `prices-market.json` | Latest prices, market only | 505 KB | 128 KB |
 | `history/<setId>.json` | 200 files, one per set with priced cards | day 1: 610 KB, day 2: 744 KB (all files) | 185 KB, 247 KB |
 | `daily/<YYYY-MM-DD>.json` | One per price date, last 90 kept | 505 KB each | 128 KB each |
 | `.nojekyll` | Empty | 0 | 0 |
-| **Whole site, first day** | 206 files | **5.5 MB** | **1.2 MB** |
+| **Whole site, first day** | 206 files | **5.4 MB** | **1.2 MB** |
 | Whole site, full retention (projected) | 365 history dates, 90 daily files | ~100 MB | ~20 MB |
 
 The projection uses the app repository's simulation of 365 days of price movement (history ≈ 48 MB
@@ -159,10 +160,10 @@ tens of KB after a year.
 
 ```json
 {"v": 1,
- "generatedAt": "2026-10-28T21:11:11Z",
+ "generatedAt": "2026-10-28T21:17:58Z",
  "tcgcsvBuild": "2026-10-28T20:06:05+0000",
  "date": "2026-10-28",
- "index": {"path": "index.json", "sha256": "cc61d0…", "bytes": 2945465, "cards": 21290, "sets": 205},
+ "index": {"path": "index.json", "sha256": "43ca50…", "bytes": 2902783, "cards": 21290, "sets": 205},
  "prices": {"path": "prices.json", "sha256": "776633…", "bytes": 1121166, "products": 22305, "rows": 36130},
  "pricesMarket": {"path": "prices-market.json", "sha256": "aa80f9…", "bytes": 516969},
  "history": {"pathTemplate": "history/{setId}.json", "from": "2026-10-28", "to": "2026-10-28", "days": 1, "retentionDays": 365, "sets": 200},
@@ -217,7 +218,7 @@ That day's `prices-market.json`, unchanged, for the last 90 price dates.
   under the 10k/day limit. The app never contacts TCGCSV.
 * **TCGdex:** 4 workers, at most ~13 requests/s, set lists cached 1 day and cards 14 days.
 * **pokemontcg.io:** at most 30 requests/minute, 7-day cache, only sets that need a fallback image.
-  **Image CDNs:** one HEAD per new fallback URL, ≤ 10/s per host, results cached.
+  **Image CDNs** (pokemontcg.io / Scrydex): one HEAD per new fallback URL, ≤ 10/s per host, results cached.
 * The HTTP cache (`pipeline/cache/`) is kept between runs with `actions/cache`; losing it only
   makes the next run cold (~35 min, ~22k TCGdex requests).
 

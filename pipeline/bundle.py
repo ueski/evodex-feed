@@ -26,8 +26,8 @@ index.json (bundled, ~read-only catalog)
     teams and LEGEND halves); species names, generations and types are in
     species.json. Trainer and Energy cards have no "dx".
     "im" is a fallback for cards TCGdex has no image for ("i": 0): one complete
-    image file URL (images.pokemontcg.io "_hires.png" or tcgplayer-cdn
-    "_in_1000x1000.jpg"), NOT a TCGdex base to append "/low.webp" to. Decoders
+    image file URL (images.pokemontcg.io "_hires.png" or images.scrydex.com
+    ".../large"), NOT a TCGdex base to append "/low.webp" to. Decoders
     that do not know "im" keep showing the placeholder. See images.py and
     data-sources.md in the Evodex app repository "Fallback images".
     "gid" is present only when the product's TCGplayer group differs from its

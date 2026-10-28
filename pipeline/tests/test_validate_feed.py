@@ -106,6 +106,41 @@ class ValidateFeedTests(unittest.TestCase):
         os.chmod(os.path.join(f1, "prices.json"), 0o600)
         self.assertTrue(any("world-readable" in e for e in self.validate(f1)))
 
+    def rewrite_index(self, feed, mutate):
+        """Edit index.json and keep manifest sha256/bytes consistent, so only the image rule can fail."""
+        import hashlib
+        path = os.path.join(feed, "index.json")
+        with open(path) as f:
+            index = json.load(f)
+        mutate(index)
+        blob = json.dumps(index, separators=(",", ":")).encode("utf-8")
+        with open(path, "wb") as f:
+            f.write(blob)
+        m = self.manifest(feed)
+        m["index"].update(sha256=hashlib.sha256(blob).hexdigest(), bytes=len(blob))
+        with open(os.path.join(feed, "manifest.json"), "w") as f:
+            json.dump(m, f)
+
+    def test_tcgplayer_cdn_images_fail_the_build(self):
+        f1 = self.feed("f1", "2026-10-21T20:05:22+0000", DAY1)
+
+        def add(urls):
+            def mutate(index):
+                for card, url in zip(index["cards"], urls):
+                    card["i"], card["im"] = 0, url
+            return mutate
+
+        self.rewrite_index(f1, add(["https://images.pokemontcg.io/base1/4_hires.png",
+                                    "https://images.scrydex.com/pokemon/me55c-58/large"]))
+        errors, stats = validate_feed.validate(f1, None, min_cards=1, min_products=1)
+        self.assertEqual(errors, [])
+        self.assertEqual(stats["imageHosts"], {"images.pokemontcg.io": 1, "images.scrydex.com": 1})
+        self.rewrite_index(f1, add(["https://tcgplayer-cdn.tcgplayer.com/product/42382_in_1000x1000.jpg"]))
+        errors = self.validate(f1)
+        self.assertTrue(any("tcgplayer-cdn.tcgplayer.com" in e for e in errors), errors)
+        self.rewrite_index(f1, add(["https://example.com/a.png", "https://images.pokemontcg.io/a/1_hires.png"]))
+        self.assertTrue(any("allow-list" in e for e in self.validate(f1)))
+
     def test_older_build_than_previous_fails(self):
         f1, f2 = self.two_days()
         errors = self.validate(f1, self.manifest(f2), allow_shrink=True)

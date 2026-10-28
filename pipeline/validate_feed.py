@@ -14,6 +14,8 @@ It re-reads exactly the bytes that will be uploaded and checks:
   the newest one byte-identical to prices-market.json, each one's build date = its name;
 * history/: exactly manifest.history.sets files, setId = file name, ascending dates
   within retention, every series as long as its dates, at least one file ends today;
+* index.json fallback images (``im``): pokemontcg.io / Scrydex hosts only, never
+  tcgplayer-cdn.tcgplayer.com (TCGplayer is a price source only);
 * sizes: no file over 100 MB, the site under GitHub Pages' 1 GB;
 * against the previous feed (the guards that keep a bad day off the air): build not
   older, products >= 90 % (the app rejects anything less), cards >= 95 %, prices.json
@@ -30,14 +32,17 @@ import hashlib
 import json
 import os
 import sys
+import urllib.parse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import bundle  # noqa: E402
+import images  # noqa: E402
 import net  # noqa: E402
 import publish_feed  # noqa: E402
 
+TCGPLAYER_IMAGE_HOST = "tcgplayer-cdn.tcgplayer.com"   # never an image source (IP decision 2026-10-29)
 ROOT_FILES = {"manifest.json", "index.json", "prices.json", "prices-market.json", ".nojekyll"}
 MAX_FILE_BYTES = 100 * 1000 * 1000
 MAX_SITE_BYTES = 1000 * 1000 * 1000
@@ -110,6 +115,18 @@ def validate(site, previous_manifest=None, allow_shrink=False, min_cards=15000, 
                  % (cards, m["index"].get("cards")))
         r.expect(m["index"].get("sets") == len(sets), "index.json has %d sets, manifest says %r"
                  % (len(sets), m["index"].get("sets")))
+        # Fallback images ("im"): pokemontcg.io / Scrydex only. TCGplayer is credited for prices only.
+        ims = [c.get("im") for c in index.get("cards") or [] if c.get("im")]
+        hosts = {}
+        for u in ims:
+            host = urllib.parse.urlparse(u).netloc
+            hosts[host] = hosts.get(host, 0) + 1
+        r.expect(not hosts.get(TCGPLAYER_IMAGE_HOST), "index.json: %d card images (im) on %s; TCGplayer images "
+                 "must not be used" % (hosts.get(TCGPLAYER_IMAGE_HOST, 0), TCGPLAYER_IMAGE_HOST))
+        off_list = [u for u in ims if not images.allowed(u)]
+        r.expect(not off_list, "index.json: %d im URLs off the allow-list %s, e.g. %s"
+                 % (len(off_list), list(images.ALLOWED_HOSTS), off_list[:1]))
+        stats["imageHosts"] = hosts
     if isinstance(prices, dict):
         products, rows = publish_feed.price_counts(prices)
         r.expect(prices.get("tcgcsvBuild") == build, "prices.json build %r != manifest %r"
@@ -243,6 +260,7 @@ def validate(site, previous_manifest=None, allow_shrink=False, min_cards=15000, 
 def print_stats(stats):
     print("validated: %d cards, %d products, %d price rows, history up to %d day(s)"
           % (stats.get("cards", 0), stats.get("products", 0), stats.get("rows", 0), stats.get("historyDays", 0)))
+    print("  fallback images (im) by host: %s" % (stats.get("imageHosts") or "none"))
     for name in sorted(stats["sizes"]):
         s = stats["sizes"][name]
         print("  %-20s %4d file(s)  raw %10s  gzip %10s"

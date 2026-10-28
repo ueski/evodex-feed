@@ -163,11 +163,10 @@ def check_image_urls(urls, status_cache, offline, workers=4):
     return len(todo)
 
 
-def add_image_fallbacks(args, overrides, physical, cards_out, products_raw):
+def add_image_fallbacks(args, overrides, physical, cards_out):
     """Sets c["imageFallback"] = {"source", "url"} on cards without a TCGdex
-    image (images.py) and returns the report block for summary.json."""
+    image (images.py: pokemontcg.io / Scrydex only) and returns the report block for summary.json."""
     need = [c for c in cards_out if not c.get("image")]
-    image_by_pid = {p["productId"]: p.get("imageUrl") for ps in products_raw.values() for p in ps}
     # --offline --online-aux: catalog and prices from the cache, image sources live
     offline = args.offline and not args.online_aux
     ptcg = sources.PokemonTCGio(args.cache, offline=offline)
@@ -199,22 +198,20 @@ def add_image_fallbacks(args, overrides, physical, cards_out, products_raw):
         for cid, p in images.match_cards(briefs, pcards).items():
             ptcg_hit[cid] = images.large_image(p)
 
-    candidates = {}
-    for c in need:
-        tp = c.get("tcgplayer")
-        tcgp = images.tcgplayer_large(image_by_pid.get(tp["productId"]), tp["productId"]) if tp else None
-        candidates[c["id"]] = [("ptcgio", ptcg_hit.get(c["id"])), ("tcgplayer", tcgp)]
+    candidates = {c["id"]: [("ptcgio", ptcg_hit.get(c["id"]))] for c in need}
 
     status_path = os.path.join(args.cache, "images", "status.json")
     status_cache = load_image_status(status_path)
     checked = 0
     if not args.no_image_check:
-        # first choices, then second choices for the cards whose first choice failed
-        checked += check_image_urls([cs[0][1] for cs in candidates.values()], status_cache, offline)
-        firsts_ok = {cid for cid, cs in candidates.items()
-                     if cs[0][1] and (status_cache.get(cs[0][1]) or [200])[0] == 200}
-        checked += check_image_urls([cs[1][1] for cid, cs in candidates.items() if cid not in firsts_ok],
-                                    status_cache, offline)
+        # rank by rank: the next choice is checked only for the cards whose earlier choices all failed
+        settled = set()
+        for rank in range(max((len(cs) for cs in candidates.values()), default=0)):
+            todo = [cs[rank][1] for cid, cs in candidates.items() if cid not in settled and rank < len(cs)]
+            checked += check_image_urls([u for u in todo if images.allowed(u)], status_cache, offline)
+            settled |= {cid for cid, cs in candidates.items()
+                        if rank < len(cs) and cs[rank][1] and images.allowed(cs[rank][1])
+                        and (status_cache.get(cs[rank][1]) or [200])[0] == 200}
         if checked:
             net._atomic_write(status_path, json.dumps(status_cache, sort_keys=True, indent=0).encode("utf-8"))
 
@@ -232,6 +229,7 @@ def add_image_fallbacks(args, overrides, physical, cards_out, products_raw):
                 failed[source] += 1
         source, url = images.choose(candidates[c["id"]], status)
         if url:
+            assert images.allowed(url), url
             c["imageFallback"] = {"source": source, "url": url}
             counts[source] += 1
             if status(url) is None:
@@ -251,8 +249,6 @@ def add_image_fallbacks(args, overrides, physical, cards_out, products_raw):
                          "cards": len(by_set[sid]),
                          "ptcgio": sum(1 for c in by_set[sid]
                                        if (c.get("imageFallback") or {}).get("source") == "ptcgio"),
-                         "tcgplayer": sum(1 for c in by_set[sid]
-                                          if (c.get("imageFallback") or {}).get("source") == "tcgplayer"),
                          "none": len(uncovered.get(sid, []))}
                    for sid in sorted(by_set)},
         "uncovered": {sid: ids for sid, ids in sorted(uncovered.items())},
@@ -493,7 +489,7 @@ def build(args):
 
     # ---- fallback images for cards TCGdex has no scan for (images.py)
     log("Fallback images ...")
-    image_report = add_image_fallbacks(args, overrides, physical, cards_out, products_raw)
+    image_report = add_image_fallbacks(args, overrides, physical, cards_out)
     log("  %d without TCGdex image: %s, none %d  (%s)" % (
         image_report["withoutTcgdex"], image_report["fallback"], image_report["none"], net.STATS))
 
@@ -813,17 +809,16 @@ def render_report(summary, cov, map_report, set_meta):
           tp["cardmarketAvg30"], pct(tp["cardmarketAvg30"], tp["cards"])))
     im = summary["images"]
     a("## Images\n")
-    a("TCGdex image: %d of %d cards. Without one: %d; fallback from pokemontcg.io %d, TCGplayer %d, "
+    a("TCGdex image: %d of %d cards. Without one: %d; fallback from pokemontcg.io %d, "
       "none %d. Cards with some image: %.1f%%. HEAD checks this run: %d; candidates rejected by the "
       "check: %s; chosen without a recorded check: %s.\n" % (
           im["tcgdex"], im["cards"], im["withoutTcgdex"], im["fallback"]["ptcgio"],
-          im["fallback"]["tcgplayer"], im["none"], im["coveredPct"], im["headChecked"],
+          im["none"], im["coveredPct"], im["headChecked"],
           im["rejectedByHead"] or "none", im["chosenUnchecked"] or "none"))
-    a("| Set | No TCGdex image | pokemontcg.io set | pokemontcg.io | TCGplayer | none |")
-    a("|---|---:|---|---:|---:|---:|")
+    a("| Set | No TCGdex image | pokemontcg.io set | pokemontcg.io | none |")
+    a("|---|---:|---|---:|---:|")
     for sid, r in im["setMap"].items():
-        a("| %s | %d | %s | %d | %d | %d |" % (sid, r["cards"], r["ptcgioSet"] or "-", r["ptcgio"],
-                                              r["tcgplayer"], r["none"]))
+        a("| %s | %d | %s | %d | %d |" % (sid, r["cards"], r["ptcgioSet"] or "-", r["ptcgio"], r["none"]))
     sp = summary["species"]
     a("\n## Species\n")
     a("%d species (PokéAPI; by generation %s). Pokémon cards with dx: %d of %d (%d with several species). "

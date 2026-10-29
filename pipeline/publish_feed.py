@@ -31,6 +31,12 @@ catalog-floor.json (every catalog an app version ships with) must still be in
 today's index.json, or the build stops; --allow-shrink does not override this.
 A card that must really go is listed in overrides.json "removedCards".
 
+Affiliate links (links.json next to this file, evodex-feed only): {"tcgplayerAffiliate": null}
+is the switch for the app's TCGplayer affiliate links. A string is written to the manifest as
+links.tcgplayerAffiliate (checked like the app does: https, "{url}" exactly once, host
+tcgplayer.pxf.io / www.tcgplayer.com / tcgplayer.com); "" is written too and means "off"; null
+or no file writes no links block (the app's default: plain links). An invalid value stops the build.
+
 History seeds (history-seed/<YYYY-MM-DD>.json, a prices-market.json of an
 earlier TCGCSV build we downloaded ourselves): each build folds a seed into
 every history file and daily/ that lacks that date (history.insert_column), so a
@@ -48,6 +54,7 @@ import json
 import os
 import re
 import shutil
+import string
 import sys
 import tempfile
 import time
@@ -74,6 +81,15 @@ MIN_PRICES_BYTES_RATIO = 0.80
 CATALOG_FLOOR = os.path.join(HERE, "catalog-floor.json")
 OVERRIDES = os.path.join(HERE, "overrides.json")
 SEED_DIR = os.path.join(HERE, "history-seed")
+LINKS = os.path.join(HERE, "links.json")
+# The app's TCGplayerAffiliate rules (Binderly/Core/Links/TCGplayerAffiliate.swift); keep both in step.
+AFFILIATE_HOSTS = frozenset(("tcgplayer.pxf.io", "www.tcgplayer.com", "tcgplayer.com"))
+AFFILIATE_PLACEHOLDER = "{url}"
+AFFILIATE_MAX_TEMPLATE = 1024
+AFFILIATE_MAX_URL = 4096
+AFFILIATE_SAMPLE = "https://www.tcgplayer.com/product/42382"
+# Characters a URL may contain as written (RFC 3986): no space, quote, backslash, braces or non-ASCII.
+_URL_CHARS = frozenset(string.ascii_letters + string.digits + "-._~:/?#[]@!$&'()*+,;=%")
 
 
 class PublishError(Exception):
@@ -301,6 +317,74 @@ def missing_cards_problem(required, index_obj):
             % (len(missing), ", ".join(missing[:25]) + (" ..." if len(missing) > 25 else "")))
 
 
+# ---- affiliate links ----------------------------------------------------------------
+
+def _affiliate_url_problem(url):
+    bad = sorted({c for c in url if c not in _URL_CHARS})
+    if bad:
+        return "contains characters a URL can't (%s)" % ", ".join(repr(c) for c in bad[:5])
+    parts = urllib.parse.urlsplit(url)
+    if parts.scheme.lower() != "https":
+        return "must be https, not %r" % parts.scheme
+    if "@" in parts.netloc:
+        return "must not carry user info (%r)" % parts.netloc
+    try:
+        port = parts.port
+    except ValueError:
+        return "has an invalid port (%r)" % parts.netloc
+    if port not in (None, 443):
+        return "must not use port %d" % port
+    host = parts.hostname or ""
+    if host not in AFFILIATE_HOSTS:
+        return "host %r is not one of %s" % (host, ", ".join(sorted(AFFILIATE_HOSTS)))
+    return None
+
+
+def affiliate_template_problem(template):
+    """Why ``template`` can't be links.tcgplayerAffiliate, or None. "" (off) passes. Same rules as the
+    app: https, "{url}" exactly once, no user info, no port but 443, host in AFFILIATE_HOSTS, at most
+    1,024 bytes; also checked with a product URL in place of {url} (the app re-checks every link)."""
+    if not isinstance(template, str):
+        return "must be a string or null, not %s" % type(template).__name__
+    if template == "":
+        return None
+    if template != template.strip():
+        return "has leading or trailing whitespace"
+    size = len(template.encode("utf-8"))
+    if size > AFFILIATE_MAX_TEMPLATE:
+        return "is %d bytes (at most %d)" % (size, AFFILIATE_MAX_TEMPLATE)
+    count = template.count(AFFILIATE_PLACEHOLDER)
+    if count != 1:
+        return "must contain {url} exactly once (found %d)" % count
+    problem = _affiliate_url_problem(template.replace(AFFILIATE_PLACEHOLDER, "x"))
+    if problem:
+        return problem
+    wrapped = template.replace(AFFILIATE_PLACEHOLDER, urllib.parse.quote(AFFILIATE_SAMPLE, safe=""))
+    if len(wrapped) > AFFILIATE_MAX_URL:
+        return "makes links longer than %d characters" % AFFILIATE_MAX_URL
+    return _affiliate_url_problem(wrapped)
+
+
+def load_links(path=LINKS):
+    """The manifest's "links" block from links.json, or None (no file, or tcgplayerAffiliate null).
+    Keys starting with "_" are comments; any other unknown key, or an invalid template, is an error."""
+    if not path or not os.path.isfile(path):
+        return None
+    doc = _load_json_file(path)
+    if not isinstance(doc, dict):
+        raise PublishError("%s must hold a JSON object" % path)
+    unknown = sorted(k for k in doc if not k.startswith("_") and k != "tcgplayerAffiliate")
+    if unknown:
+        raise PublishError("%s: unknown key(s) %s (expected \"tcgplayerAffiliate\")" % (path, ", ".join(unknown)))
+    template = doc.get("tcgplayerAffiliate")
+    if template is None:
+        return None
+    problem = affiliate_template_problem(template)
+    if problem:
+        raise PublishError("%s: tcgplayerAffiliate %s" % (path, problem))
+    return {"tcgplayerAffiliate": template}
+
+
 # ---- history seeds -----------------------------------------------------------------
 
 def load_seeds(seed_dir=SEED_DIR):
@@ -341,11 +425,12 @@ def check_not_regressing(prev_manifest, today_build, index_obj, prices_obj, pric
 
 
 def build_feed(bundle_dir, out_dir, previous, history_retention=365, daily_retention=90,
-               allow_shrink=False, seeds=(), floor=(), removed=()):
+               allow_shrink=False, seeds=(), floor=(), removed=(), links=None):
     """Write a complete feed directory. Returns a summary dict.
 
     ``seeds``: [(date, prices-market.json bytes)] (load_seeds); ``floor`` / ``removed``:
-    catalog-floor.json card ids (load_floor) and overrides.json "removedCards" (load_removed).
+    catalog-floor.json card ids (load_floor) and overrides.json "removedCards" (load_removed);
+    ``links``: the manifest's "links" block (load_links), None = none.
     The previous feed's own index.json is always enforced."""
     b = read_bundle(bundle_dir)
     bm = b["manifest"]
@@ -432,6 +517,8 @@ def build_feed(bundle_dir, out_dir, previous, history_retention=365, daily_reten
     manifest["history"] = {"pathTemplate": HISTORY_TEMPLATE, "from": hist_from, "to": date if n_history else None,
                            "days": hist_days, "retentionDays": history_retention, "sets": n_history}
     manifest["daily"] = {"pathTemplate": DAILY_TEMPLATE, "dates": kept, "retentionDays": daily_retention}
+    if links:
+        manifest["links"] = dict(links)
     files["manifest.json"] = bundle.dumps_compact(manifest)
     files[".nojekyll"] = b""
 
@@ -483,13 +570,17 @@ def summarize(files, manifest, statuses):
              "gzip": sum(s["gzip"] for s in sizes.values())}
     return {"date": manifest["date"], "tcgcsvBuild": manifest["tcgcsvBuild"],
             "historyStatus": statuses, "historyDays": manifest["history"]["days"],
-            "dailyDates": len(manifest["daily"]["dates"]), "sizes": sizes, "total": total}
+            "dailyDates": len(manifest["daily"]["dates"]), "sizes": sizes, "total": total,
+            "affiliate": (manifest.get("links") or {}).get("tcgplayerAffiliate")}
 
 
 def print_summary(summary):
     print("feed %s (TCGCSV build %s)" % (summary["date"], summary["tcgcsvBuild"]))
     print("  history: %s, up to %d day(s); daily snapshots: %d"
           % (summary["historyStatus"], summary["historyDays"], summary["dailyDates"]))
+    affiliate = summary.get("affiliate")
+    print("  affiliate links: %s" % ("on, " + affiliate if affiliate else
+                                     "off (links.tcgplayerAffiliate \"\")" if affiliate == "" else "off (no links block)"))
     for name in sorted(summary["sizes"]):
         s = summary["sizes"][name]
         print("  %-20s %4d file(s)  raw %10s  gzip %10s"
@@ -613,6 +704,8 @@ def main(argv=None):
     b.add_argument("--seed-dir", default=SEED_DIR,
                    help="history seeds folded in when their date is absent (default: history-seed/ next to "
                         "this file; '' = none)")
+    b.add_argument("--links", default=LINKS,
+                   help="affiliate link switch (default: links.json next to this file; missing = no links block)")
 
     fl = sub.add_parser("floor", help="add every card of index.json files to catalog-floor.json")
     fl.add_argument("--add", nargs="+", required=True, metavar="INDEX_JSON")
@@ -634,7 +727,8 @@ def main(argv=None):
         if args.cmd == "build":
             summary = build_feed(args.bundle, args.out, previous_state(args),
                                  args.history_retention, args.daily_retention, args.allow_shrink,
-                                 seeds=load_seeds(args.seed_dir), floor=load_floor(), removed=load_removed())
+                                 seeds=load_seeds(args.seed_dir), floor=load_floor(), removed=load_removed(),
+                                 links=load_links(args.links))
             print_summary(summary)
             return 0
         if args.cmd == "floor":

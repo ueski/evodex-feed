@@ -14,6 +14,9 @@ It re-reads exactly the bytes that will be uploaded and checks:
   the newest one byte-identical to prices-market.json, each one's build date = its name;
 * history/: exactly manifest.history.sets files, setId = file name, ascending dates
   within retention, every series as long as its dates, at least one file ends today;
+* links (optional, v0.3.1): an object; links.tcgplayerAffiliate null, "" (off) or a template the
+  app accepts (https, "{url}" exactly once, host tcgplayer.pxf.io / www.tcgplayer.com /
+  tcgplayer.com; publish_feed.affiliate_template_problem);
 * index.json fallback images (``im``): pokemontcg.io / Scrydex hosts only, never
   tcgplayer-cdn.tcgplayer.com (TCGplayer is a price source only); a custom TCGdex
   image base (``"i": "<url>"``, a TCGdex twin's scan) only on assets.tcgdex.net;
@@ -96,6 +99,13 @@ def validate(site, previous_manifest=None, allow_shrink=False, min_cards=15000, 
     build = m.get("tcgcsvBuild") or ""
     date = m.get("date")
     r.expect(bool(build) and date == build[:10], "manifest date %r does not match tcgcsvBuild %r" % (date, build))
+    if "links" in m:
+        links = m["links"]
+        if r.expect(isinstance(links, dict), "manifest links must be an object, not %r" % (links,)):
+            template = links.get("tcgplayerAffiliate")
+            problem = None if template is None else publish_feed.affiliate_template_problem(template)
+            r.expect(problem is None, "manifest links.tcgplayerAffiliate %s" % problem)
+            stats["affiliate"] = template
 
     # ---- latest files: sha256, bytes, counts
     blobs, objs = {}, {}
@@ -280,6 +290,7 @@ def print_stats(stats):
           % (stats.get("cards", 0), stats.get("products", 0), stats.get("rows", 0), stats.get("historyDays", 0)))
     print("  fallback images (im) by host: %s; TCGdex twin images (i): %d; cards that must stay: %d"
           % (stats.get("imageHosts") or "none", stats.get("customImages", 0), stats.get("requiredCards", 0)))
+    print("  affiliate links: %s" % ("on, " + stats["affiliate"] if stats.get("affiliate") else "off"))
     for name in sorted(stats["sizes"]):
         s = stats["sizes"][name]
         print("  %-20s %4d file(s)  raw %10s  gzip %10s"

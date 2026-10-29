@@ -191,6 +191,8 @@ tens of KB after a year.
 * `history.days` = most dates in any history file; `history.sets` = number of history files. A
   set with no priced product has no file (404 = "no history yet").
 * `daily.dates` is ascending and lists exactly the files present.
+* `links` (optional, Evodex 0.3.1+): `{"tcgplayerAffiliate": "<template>"}` switches the app's TCGplayer
+  affiliate links on; absent = off. See "Affiliate links".
 * Adding keys keeps `v: 1`; a breaking change bumps `v`, and apps ignore a `v` they don't know.
 
 ### prices.json / prices-market.json
@@ -243,11 +245,38 @@ That day's `prices-market.json`, unchanged, for the last 90 price dates.
 * The HTTP cache (`pipeline/cache/`) is kept between runs with `actions/cache`; losing it only
   makes the next run cold (~35 min, ~22k TCGdex requests).
 
+## Affiliate links
+
+Evodex 0.3.1+ can wrap its "View on TCGplayer" links in a TCGplayer affiliate link (TCGplayer's
+program runs on Impact) and then shows "Evodex may earn a commission from TCGplayer purchases."
+under every such link. It is **off**: `pipeline/links.json` holds `"tcgplayerAffiliate": null`, so
+the manifest has no `links` block. The switch lives only in this repository (the app repository's
+`feed_sync.py copy` never touches it).
+
+To switch it on after the affiliate application is approved:
+
+1. Put the Impact tracking link for TCGplayer into `pipeline/links.json`, with `{url}` where the
+   destination goes (Impact's deep-link parameter is usually `u`):
+   `"tcgplayerAffiliate": "https://tcgplayer.pxf.io/c/<id>/<ad>/<campaign>?u={url}"`
+2. Commit to `main`, then `gh workflow run price-feed.yml -f force=true` (or wait for the next
+   nightly build). The manifest gets `"links":{"tcgplayerAffiliate":"…"}`; apps pick it up at
+   their next feed check and keep the last value while offline.
+3. Update the **Notice** above: Evodex is then a TCGplayer affiliate, so drop TCGplayer from
+   "not affiliated with" (the app's own disclaimers switch by themselves).
+
+Rules (checked by `publish_feed.py build` and `validate_feed.py`, and again by the app): `https`,
+`{url}` exactly once, host `tcgplayer.pxf.io`, `www.tcgplayer.com` or `tcgplayer.com`, no user info
+or port, at most 1,024 characters. An invalid value stops the build, so the live feed is never
+changed by a typo. The app accepts nothing else either, so even a tampered feed cannot send users
+to another site. To switch off: `null` (no `links` block) or `""` (an explicit "off" that also
+overrides a template built into an app version), then rebuild as in step 2.
+
 ## Operations
 
 | Task | How |
 |---|---|
 | Turn the feed off / on | `gh workflow disable "Price feed"` / `gh workflow enable "Price feed"` |
+| Switch affiliate links on / off | `pipeline/links.json` `tcgplayerAffiliate`, then `gh workflow run price-feed.yml -f force=true` ("Affiliate links") |
 | Run now | `gh workflow run price-feed.yml` (add `-f force=true` to rebuild the same TCGCSV build) |
 | Accept a sharp shrink once | `gh workflow run price-feed.yml -f allow_shrink=true` |
 | Undo a bad day | Revert the day's commit on `data` (`git revert`, push), then `gh workflow run price-feed.yml -f force=true` |
@@ -277,9 +306,10 @@ each scheduled run re-enables the workflow to keep the schedule alive.
 | `pipeline/overrides.json` | Hand-maintained mapping fixes; `removedCards` (the only cards allowed to leave the catalog) |
 | `pipeline/catalog-floor.json` | Every card a shipped app catalog contains; `index.json` must always contain them |
 | `pipeline/history-seed/` | One-time history seeds (feed-only; see "History and state") |
+| `pipeline/links.json` | The affiliate-link switch (feed-only; see "Affiliate links") |
 | `pipeline/tests/` | `python3 -m unittest` |
 
-Everything in `pipeline/` except `history-seed/` is a byte-identical copy of the shared files in the Evodex app
+Everything in `pipeline/` except `history-seed/` and `links.json` is a byte-identical copy of the shared files in the Evodex app
 repository's `tools/pipeline/`, which is the source of truth (its `feed_sync.py check` / `copy` lists them). Make
 pipeline changes there and copy them here, so the bundled catalog and the nightly one come from the same code.
 

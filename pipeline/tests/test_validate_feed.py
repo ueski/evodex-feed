@@ -6,7 +6,7 @@ import unittest
 
 import publish_feed
 import validate_feed
-from tests.test_publish_feed import CARDS, make_bundle
+from tests.test_publish_feed import CARDS, HOSTILE_TEMPLATES, IMPACT, make_bundle
 
 DAY1 = {"42382": [[1, 95465, 1, 2, 3, 4]], "42383": [[0, 100, 1, 2, 3, 4]], "500": [[0, 25, None, None, None, None]]}
 DAY2 = {"42382": [[1, 96000, 1, 2, 3, 4]], "42383": [[1, 900, 1, 2, 3, 4]], "500": [[0, 30, None, None, None, None]]}
@@ -178,6 +178,35 @@ class ValidateFeedTests(unittest.TestCase):
         self.assertEqual(self.manifest(f1)["daily"]["dates"], ["2026-10-20", "2026-10-21"])
         self.assertEqual(self.validate(f1, seed_dates=["2026-10-20"]), [])
         self.assertTrue(any("first run" in e for e in self.validate(f1)))
+
+    def rewrite_manifest(self, feed, mutate):
+        path = os.path.join(feed, "manifest.json")
+        m = self.manifest(feed)
+        mutate(m)
+        with open(path, "w") as f:
+            json.dump(m, f)
+
+    def test_links_are_optional_and_checked(self):
+        f1 = self.feed("f1", "2026-10-21T20:05:22+0000", DAY1, links={"tcgplayerAffiliate": IMPACT})
+        self.assertEqual(self.validate(f1), [])
+        errors, stats = validate_feed.validate(f1, None, min_cards=1, min_products=1)
+        self.assertEqual(stats["affiliate"], IMPACT)
+        for links in ({"tcgplayerAffiliate": ""}, {"tcgplayerAffiliate": None}, {}, {"future": 1}):
+            self.rewrite_manifest(f1, lambda m, links=links: m.update(links=links))
+            self.assertEqual(self.validate(f1), [], links)
+        self.rewrite_manifest(f1, lambda m: m.pop("links"))
+        self.assertEqual(self.validate(f1), [], "a feed without links (every feed before v0.3.1)")
+
+    def test_hostile_or_malformed_links_fail(self):
+        f1 = self.feed("f1", "2026-10-21T20:05:22+0000", DAY1)
+        for template in HOSTILE_TEMPLATES + [7, ["x"]]:
+            self.rewrite_manifest(f1, lambda m, t=template: m.update(links={"tcgplayerAffiliate": t}))
+            errors = self.validate(f1)
+            self.assertEqual(len(errors), 1, str(template)[:80])
+            self.assertIn("links.tcgplayerAffiliate", errors[0])
+        for links in ("https://tcgplayer.pxf.io/?u={url}", ["x"], 1):
+            self.rewrite_manifest(f1, lambda m, links=links: m.update(links=links))
+            self.assertTrue(any("links must be an object" in e for e in self.validate(f1)), links)
 
     def test_older_build_than_previous_fails(self):
         f1, f2 = self.two_days()

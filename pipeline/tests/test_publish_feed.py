@@ -514,6 +514,108 @@ class HistorySeedTests(unittest.TestCase):
             publish_feed.load_seeds(d)
 
 
+IMPACT = "https://tcgplayer.pxf.io/c/1234567/1830156/21018?u={url}"
+# Templates a compromised or mistyped feed config could carry; the app rejects the same ones
+# (BinderlyTests/Core/Links/TCGplayerAffiliateTests.swift).
+HOSTILE_TEMPLATES = [
+    "https://evil.com/?u={url}",
+    "https://tcgplayer.pxf.io.evil.com/?u={url}",
+    "https://evil.tcgplayer.com/?u={url}",
+    "https://tcgplayer.pxf.io./?u={url}",
+    "https://tcgplayer%2Epxf.io/?u={url}",
+    "http://tcgplayer.pxf.io/c/1/2/3?u={url}",
+    "javascript:alert(1)//{url}",
+    "//tcgplayer.pxf.io/?u={url}",
+    "https://tcgplayer.pxf.io@evil.com/?u={url}",
+    "https://user:pass@tcgplayer.pxf.io/?u={url}",
+    "https://tcgplayer.pxf.io\\@evil.com/?u={url}",
+    "https://{url}@tcgplayer.pxf.io/",
+    "https://tcgplayer.pxf.io{url}/",
+    "https://tcgplayer.pxf.io:8443/?u={url}",
+    "https://tcgplayer.pxf.io/c 1?u={url}",
+    "https://tcgplayer.pxf.\u0456o/?u={url}",
+    "https://tcgplayer.pxf.io/c/1/2/3",
+    "https://tcgplayer.pxf.io/?u={url}&v={url}",
+    "https://tcgplayer.pxf.io/?u={URL}",
+    " " + IMPACT,
+    "https://tcgplayer.pxf.io/?pad=" + "a" * 1000 + "&u={url}",
+    "x" * 5000000 + "{url}",
+]
+
+
+class AffiliateLinksTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp)
+
+    def links_file(self, doc):
+        path = os.path.join(self.tmp, "links.json")
+        with open(path, "w") as f:
+            f.write(doc if isinstance(doc, str) else json.dumps(doc))
+        return path
+
+    def test_accepts_impact_and_tcgplayer_templates(self):
+        for template in (IMPACT, "https://www.tcgplayer.com/partner?ref=evodex&u={url}", "https://tcgplayer.com/r/{url}",
+                         "HTTPS://TCGPLAYER.PXF.IO/c/1/2/3?u={url}", "https://tcgplayer.pxf.io:443/?u={url}", ""):
+            self.assertIsNone(publish_feed.affiliate_template_problem(template), template)
+
+    def test_rejects_hostile_templates(self):
+        for template in HOSTILE_TEMPLATES:
+            self.assertIsNotNone(publish_feed.affiliate_template_problem(template), template[:80])
+        for value in (42, ["x"], {"u": IMPACT}, True):
+            self.assertIsNotNone(publish_feed.affiliate_template_problem(value), value)
+
+    def test_load_links(self):
+        self.assertIsNone(publish_feed.load_links(os.path.join(self.tmp, "missing.json")))
+        self.assertIsNone(publish_feed.load_links(self.links_file({"tcgplayerAffiliate": None})))
+        self.assertIsNone(publish_feed.load_links(self.links_file({"_comment": "off until approval"})))
+        self.assertEqual(publish_feed.load_links(self.links_file({"tcgplayerAffiliate": IMPACT, "_note": "x"})),
+                         {"tcgplayerAffiliate": IMPACT})
+        self.assertEqual(publish_feed.load_links(self.links_file({"tcgplayerAffiliate": ""})), {"tcgplayerAffiliate": ""})
+
+    def test_load_links_refuses_bad_config(self):
+        for doc in ({"tcgplayerAffiliate": "https://evil.com/?u={url}"}, {"tcgPlayerAffiliate": IMPACT}, [IMPACT],
+                    {"tcgplayerAffiliate": 7}):
+            with self.assertRaises(publish_feed.PublishError, msg=str(doc)):
+                publish_feed.load_links(self.links_file(doc))
+        with self.assertRaises(ValueError):
+            publish_feed.load_links(self.links_file("{not json"))
+
+    def test_manifest_has_links_only_when_configured(self):
+        bundle_dir = make_bundle(os.path.join(self.tmp, "b"), "2026-10-21T20:05:22+0000", CARDS,
+                                 {"42382": [[1, 95465, 1, 2, 3, 4]]})
+        for links, expected in ((None, None), ({"tcgplayerAffiliate": IMPACT}, {"tcgplayerAffiliate": IMPACT}),
+                                ({"tcgplayerAffiliate": ""}, {"tcgplayerAffiliate": ""})):
+            out = os.path.join(self.tmp, "feed")
+            summary = publish_feed.build_feed(bundle_dir, out, publish_feed.NoPrevious(), links=links)
+            manifest = read(os.path.join(out, "manifest.json"))
+            self.assertEqual(manifest.get("links"), expected)
+            self.assertEqual("links" in manifest, links is not None)
+            self.assertEqual(summary["affiliate"], (links or {}).get("tcgplayerAffiliate"))
+
+    def test_cli_reads_links_json(self):
+        bundle_dir = make_bundle(os.path.join(self.tmp, "b"), "2026-10-21T20:05:22+0000", CARDS,
+                                 {"42382": [[1, 95465, 1, 2, 3, 4]]})
+        out = os.path.join(self.tmp, "feed")
+        args = ["build", "--bundle", bundle_dir, "--out", out, "--seed-dir", ""]
+        # The repository's catalog floor is for real bundles; this one has four cards.
+        self.addCleanup(setattr, publish_feed, "load_floor", publish_feed.load_floor)
+        publish_feed.load_floor = lambda *a, **k: set()
+        self.assertEqual(publish_feed.main(args + ["--links", self.links_file({"tcgplayerAffiliate": IMPACT})]), 0)
+        self.assertEqual(read(os.path.join(out, "manifest.json"))["links"], {"tcgplayerAffiliate": IMPACT})
+        bad = self.links_file({"tcgplayerAffiliate": "https://tcgplayer.pxf.io@evil.com/?u={url}"})
+        self.assertEqual(publish_feed.main(args + ["--links", bad]), 1, "an invalid switch stops the build")
+        self.assertEqual(read(os.path.join(out, "manifest.json"))["links"], {"tcgplayerAffiliate": IMPACT},
+                         "and leaves the previous output untouched")
+
+    def test_repository_switch_is_valid(self):
+        """links.json is evodex-feed's switch (feed_sync FEED_ONLY): there it must load (a broken one would stop the
+        nightly build); the app repository has none, so a local build writes no links block."""
+        links = publish_feed.load_links()   # raises PublishError for a broken switch
+        if not os.path.exists(publish_feed.LINKS):
+            self.assertIsNone(links)
+
+
 class CheckTests(unittest.TestCase):
     NOW = datetime.datetime(2026, 10, 22, 21, 15, tzinfo=datetime.timezone.utc)
 

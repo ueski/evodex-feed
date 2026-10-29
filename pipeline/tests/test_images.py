@@ -1,5 +1,7 @@
 import json
 import os
+import shutil
+import tempfile
 import unittest
 
 import bundle
@@ -132,18 +134,80 @@ class ThumbnailAndHostTests(unittest.TestCase):
                          "https://images.pokemontcg.io/swsh9tg/TG01.png")
         self.assertEqual(images.thumbnail_url("https://images.scrydex.com/pokemon/me55c-58/large"),
                          "https://images.scrydex.com/pokemon/me55c-58/small")
+        self.assertEqual(images.thumbnail_url("https://tcgplayer-cdn.tcgplayer.com/product/118819_in_1000x1000.jpg"),
+                         "https://tcgplayer-cdn.tcgplayer.com/product/118819_in_400x400.jpg")
         self.assertEqual(images.thumbnail_url("https://example.com/a.png"), "https://example.com/a.png")
 
-    def test_only_pokemontcgio_and_scrydex_are_allowed(self):
-        """v0.3 IP decision: TCGplayer's product photos are no longer a source (research.md §3.4)."""
-        self.assertEqual(images.SOURCES, ("ptcgio", "scrydex"))
+    def test_pokemontcgio_and_scrydex_always_tcgplayer_only_behind_the_switch(self):
+        """v0.3 IP decision, re-opened 2026-10-29: TCGplayer's product photos only while images.json switches
+        them on, and only in the one shape the pipeline writes (research.md §3.4)."""
+        self.assertEqual(images.SOURCES, ("ptcgio", "scrydex", "tcgplayer"))
         self.assertEqual(images.ALLOWED_HOSTS, ("images.pokemontcg.io", "images.scrydex.com"))
-        self.assertTrue(images.allowed("https://images.pokemontcg.io/a/1_hires.png"))
-        self.assertTrue(images.allowed("https://images.scrydex.com/pokemon/me55c-58/large"))
-        self.assertFalse(images.allowed("https://tcgplayer-cdn.tcgplayer.com/product/1_in_1000x1000.jpg"))
-        self.assertFalse(images.allowed("http://images.pokemontcg.io/a/1_hires.png"))
-        self.assertFalse(images.allowed(None))
-        self.assertFalse(hasattr(images, "tcgplayer_large"))
+        tcgp = "https://tcgplayer-cdn.tcgplayer.com/product/1_in_1000x1000.jpg"
+        for switch in (False, True):
+            self.assertTrue(images.allowed("https://images.pokemontcg.io/a/1_hires.png", switch))
+            self.assertTrue(images.allowed("https://images.scrydex.com/pokemon/me55c-58/large", switch))
+            self.assertFalse(images.allowed("http://images.pokemontcg.io/a/1_hires.png", switch))
+            self.assertFalse(images.allowed(None, switch))
+        self.assertFalse(images.allowed(tcgp))
+        self.assertTrue(images.allowed(tcgp, tcgplayer=True))
+
+    def test_tcgplayer_url_has_exactly_one_shape(self):
+        self.assertEqual(images.tcgplayer_url(118819),
+                         "https://tcgplayer-cdn.tcgplayer.com/product/118819_in_1000x1000.jpg")
+        for bad in (None, 0, -5, "118819", True, 1.5):
+            self.assertIsNone(images.tcgplayer_url(bad), bad)
+        self.assertEqual(images.tcgplayer_product(images.tcgplayer_url(659612)), 659612)
+        hostile = [
+            "http://tcgplayer-cdn.tcgplayer.com/product/1_in_1000x1000.jpg",
+            "https://tcgplayer-cdn.tcgplayer.com/product/1_in_400x400.jpg",
+            "https://tcgplayer-cdn.tcgplayer.com/product/1_200w.jpg",
+            "https://tcgplayer-cdn.tcgplayer.com/product/01_in_1000x1000.jpg",
+            "https://tcgplayer-cdn.tcgplayer.com/product/x_in_1000x1000.jpg",
+            "https://tcgplayer-cdn.tcgplayer.com/product/1_in_1000x1000.jpg?x=1",
+            "https://tcgplayer-cdn.tcgplayer.com/product/1_in_1000x1000.jpg#f",
+            "https://tcgplayer-cdn.tcgplayer.com:8443/product/1_in_1000x1000.jpg",
+            "https://user@tcgplayer-cdn.tcgplayer.com/product/1_in_1000x1000.jpg",
+            "https://tcgplayer-cdn.tcgplayer.com@evil.com/product/1_in_1000x1000.jpg",
+            "https://evil.com/tcgplayer-cdn.tcgplayer.com/product/1_in_1000x1000.jpg",
+            "https://tcgplayer-cdn.tcgplayer.com.evil.com/product/1_in_1000x1000.jpg",
+            "https://TCGPLAYER-CDN.tcgplayer.com/product/1_in_1000x1000.jpg",
+            "https://tcgplayer-cdn.tcgplayer.com/product/../1_in_1000x1000.jpg",
+            "https://tcgplayer-cdn.tcgplayer.com/product/1_in_1000x1000.jpg\n",
+            " https://tcgplayer-cdn.tcgplayer.com/product/1_in_1000x1000.jpg",
+            "https://tcgplayer-cdn.tcgplayer.com/product/12345678901_in_1000x1000.jpg",
+        ]
+        for url in hostile:
+            self.assertIsNone(images.tcgplayer_product(url), url)
+            self.assertFalse(images.allowed(url, tcgplayer=True), url)
+        self.assertIsNone(images.tcgplayer_product(None))
+        self.assertTrue(images.is_tcgplayer_host("https://user@tcgplayer-cdn.tcgplayer.com:8443/x"))
+        self.assertFalse(images.is_tcgplayer_host("https://tcgplayer-cdn.tcgplayer.com.evil.com/x"))
+        self.assertFalse(images.is_tcgplayer_host(None))
+
+    def test_load_config(self):
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp)
+
+        def config(text):
+            path = os.path.join(tmp, "images.json")
+            with open(path, "w") as f:
+                f.write(text)
+            return path
+        self.assertIsNone(images.load_config(os.path.join(tmp, "missing.json")))
+        self.assertTrue(images.load_config(config('{"tcgplayerFallback": true, "_comment": "x"}')))
+        self.assertIs(images.load_config(config('{"tcgplayerFallback": false}')), False)
+        self.assertIs(images.load_config(config('{"_comment": "off"}')), False)
+        for bad in ('{"tcgplayerFallback": "true"}', '{"tcgplayerFallback": 1}', '{"tcgplayerFallback": null}',
+                    '{"tcgPlayerFallback": true}', '[true]', '{not json'):
+            with self.assertRaises(ValueError, msg=bad):
+                images.load_config(config(bad))
+
+    def test_repository_switch_is_valid(self):
+        """images.json exists only in evodex-feed (feed_sync FEED_ONLY); there it must load, here there is none."""
+        value = images.load_config()     # raises ValueError for a broken switch
+        if not os.path.exists(images.CONFIG):
+            self.assertIsNone(value)
 
     def test_a_custom_tcgdex_image_base_stays_on_tcgdex(self):
         self.assertTrue(images.allowed_tcgdex("https://assets.tcgdex.net/en/xy/xy4/24a"))
@@ -169,6 +233,61 @@ class ChooseTests(unittest.TestCase):
     def test_a_host_off_the_allow_list_is_never_chosen(self):
         self.assertEqual(images.choose([("other", self.TCGP)], {self.TCGP: 200}.get), (None, None))
         self.assertEqual(images.choose([("other", self.TCGP), ("ptcgio", self.A)], {}.get), ("ptcgio", self.A))
+        self.assertEqual(images.choose([("other", "https://example.com/a.png")], {}.get, tcgplayer=True), (None, None))
+
+    def test_tcgplayer_comes_last_needs_the_switch_and_a_200(self):
+        cands = [("ptcgio", self.A), ("tcgplayer", self.TCGP)]
+        self.assertEqual(images.choose(cands, {self.A: 404, self.TCGP: 200}.get, tcgplayer=True),
+                         ("tcgplayer", self.TCGP))
+        self.assertEqual(images.choose(cands, {self.A: 200, self.TCGP: 200}.get, tcgplayer=True), ("ptcgio", self.A))
+        self.assertEqual(images.choose(cands, {self.A: 404, self.TCGP: 200}.get), (None, None), "switch off")
+        self.assertEqual(images.choose(cands, {self.A: 404}.get, tcgplayer=True), (None, None), "never checked")
+        self.assertEqual(images.choose(cands, {self.A: 404, self.TCGP: 403}.get, tcgplayer=True), (None, None),
+                         "TCGplayer answers 403 for a product without a photo")
+
+
+class TCGplayerStockPictureTests(unittest.TestCase):
+    """A TCGplayer file that differently named cards share is a stock picture; one card's photo under several
+    products (a trainer kit's Lightning Energy at ten numbers) is a real image."""
+
+    def test_stock_etags(self):
+        u = images.tcgplayer_url
+        status = {u(1): [200, 0, "", '"energy"'], u(2): [200, 0, "", '"energy"'], u(3): [200, 0, "", '"energy"'],
+                  u(4): [200, 0, "", '"stock"'], u(5): [200, 0, "", '"stock"'], u(6): [200, 0, "", '"mew"'],
+                  u(7): [200, 0],                     # recorded before ETags were kept
+                  u(8): [403, 0, "", ""], u(9): [200, 0, "", '"stock"'],
+                  "https://images.scrydex.com/pokemon/x/large": [200, 0, "", '"stock"']}
+        names = {1: "Lightning Energy", 2: "Lightning Energy", 3: "Lightning Energy", 4: "Pikachu",
+                 5: "Bulbasaur", 6: "Ancient Mew", 7: "Pikachu", 8: "Pikachu"}
+        self.assertEqual(images.stock_etags(status, names), {'"stock"'})
+        self.assertEqual(images.stock_etags(status, {1: "Pokémon Collector", 2: "Pokemon Collector"}), set(),
+                         "compared by name_key")
+        self.assertEqual(images.stock_etags({}, names), set())
+
+
+class TCGplayerImageProblemsTests(unittest.TestCase):
+    TCGP = "https://tcgplayer-cdn.tcgplayer.com/product/%d_in_1000x1000.jpg"
+
+    def card(self, im, i=0, pid=42382):
+        c = {"s": "mep", "l": "023", "n": "X", "i": i, "im": im}
+        if pid:
+            c["p"] = [{"id": pid}, {"id": 9}]
+        return c
+
+    def test_switch_shape_tcgdex_image_and_product(self):
+        good = [self.card(self.TCGP % 42382), self.card("https://images.pokemontcg.io/a/1_hires.png", pid=None)]
+        self.assertEqual(images.tcgplayer_image_problems(good, True), [])
+        self.assertEqual(images.tcgplayer_image_problems(good[1:], False), [])
+        self.assertEqual(len(images.tcgplayer_image_problems(good, False)), 1)
+        self.assertIn("switch is off", images.tcgplayer_image_problems(good, False)[0])
+        cases = {"TCGdex image": [dict(self.card(self.TCGP % 42382), i="https://assets.tcgdex.net/en/me/mep/023")],
+                 "not of the form": [self.card("https://tcgplayer-cdn.tcgplayer.com/product/42382_200w.jpg")],
+                 "first product": [self.card(self.TCGP % 9)]}
+        for needle, cards in cases.items():
+            problems = images.tcgplayer_image_problems(cards, True)
+            self.assertEqual(len(problems), 1, problems)
+            self.assertIn(needle, problems[0])
+        self.assertEqual(len(images.tcgplayer_image_problems([self.card(self.TCGP % 42382, pid=None)], True)), 1)
 
 
 class McDonaldsMappingTests(unittest.TestCase):
@@ -271,6 +390,23 @@ class CheckImageUrlsTests(unittest.TestCase):
         n, status, _ = self.run_check({self.PROBE: (503, {}), self.PTCG: (404, {})})
         self.assertEqual(n, 1)
         self.assertEqual(set(status), {self.PTCG})
+
+    def test_tcgplayer_heads_keep_the_etag(self):
+        tcgp, gone = images.tcgplayer_url(118819), images.tcgplayer_url(98030)
+        old = images.tcgplayer_url(1)
+        responses = {tcgp: (200, {"etag": '"9301656c"'}), gone: (403, {}), old: (200, {"etag": '"e"'})}
+        original = net.http_head
+        net.http_head = lambda url, limiter=None, retries=3, timeout=30: responses[url]
+        try:
+            status = {old: [200, 2000000000]}    # a 200 without its ETag is checked again
+            n = run.check_image_urls([tcgp, gone, old], status, offline=False, workers=1)
+        finally:
+            net.http_head = original
+        self.assertEqual(n, 3)
+        self.assertEqual(status[tcgp][0], 200)
+        self.assertEqual(status[tcgp][2:], ["", '"9301656c"'])
+        self.assertEqual(status[gone][0], 403)
+        self.assertEqual(status[old][3], '"e"')
 
 
 class TwinImageTests(unittest.TestCase):

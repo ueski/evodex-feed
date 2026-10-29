@@ -37,6 +37,13 @@ links.tcgplayerAffiliate (checked like the app does: https, "{url}" exactly once
 tcgplayer.pxf.io / www.tcgplayer.com / tcgplayer.com); "" is written too and means "off"; null
 or no file writes no links block (the app's default: plain links). An invalid value stops the build.
 
+TCGplayer images (images.json next to this file, evodex-feed only; images.load_config):
+{"tcgplayerFallback": true} is the kill switch for TCGplayer product photos as the last-resort fallback
+image. The manifest gets images.tcgplayerFallback (true or false) whenever the file exists; the app shows
+tcgplayer-cdn.tcgplayer.com images only while the last good manifest says true, so false (or no file)
+switches them off in every app at its next feed check. The build stops when index.json carries a
+TCGplayer image the switch doesn't allow (images.tcgplayer_image_problems).
+
 History seeds (history-seed/<YYYY-MM-DD>.json, a prices-market.json of an
 earlier TCGCSV build we downloaded ourselves): each build folds a seed into
 every history file and daily/ that lacks that date (history.insert_column), so a
@@ -66,6 +73,7 @@ sys.path.insert(0, HERE)
 
 import bundle  # noqa: E402
 import history  # noqa: E402
+import images  # noqa: E402
 import net  # noqa: E402
 import sources  # noqa: E402
 
@@ -425,13 +433,14 @@ def check_not_regressing(prev_manifest, today_build, index_obj, prices_obj, pric
 
 
 def build_feed(bundle_dir, out_dir, previous, history_retention=365, daily_retention=90,
-               allow_shrink=False, seeds=(), floor=(), removed=(), links=None):
+               allow_shrink=False, seeds=(), floor=(), removed=(), links=None, tcgplayer_images=None):
     """Write a complete feed directory. Returns a summary dict.
 
     ``seeds``: [(date, prices-market.json bytes)] (load_seeds); ``floor`` / ``removed``:
     catalog-floor.json card ids (load_floor) and overrides.json "removedCards" (load_removed);
-    ``links``: the manifest's "links" block (load_links), None = none.
-    The previous feed's own index.json is always enforced."""
+    ``links``: the manifest's "links" block (load_links), None = none; ``tcgplayer_images``: the
+    images.json switch (images.load_config): True / False is written as images.tcgplayerFallback,
+    None (no file) writes no images block. The previous feed's own index.json is always enforced."""
     b = read_bundle(bundle_dir)
     bm = b["manifest"]
     build_stamp = bm["tcgcsvBuild"]
@@ -445,6 +454,9 @@ def build_feed(bundle_dir, out_dir, previous, history_retention=365, daily_reten
     problem = missing_cards_problem(required_cards(previous.index(), floor, removed), index_obj)
     if problem:
         raise PublishError(problem)
+    problems = images.tcgplayer_image_problems(index_obj.get("cards") or [], bool(tcgplayer_images))
+    if problems:
+        raise PublishError("; ".join(problems))
     seeds = [(d, blob) for d, blob in seeds if d < date]
 
     # history/<setId>.json
@@ -519,11 +531,15 @@ def build_feed(bundle_dir, out_dir, previous, history_retention=365, daily_reten
     manifest["daily"] = {"pathTemplate": DAILY_TEMPLATE, "dates": kept, "retentionDays": daily_retention}
     if links:
         manifest["links"] = dict(links)
+    if tcgplayer_images is not None:
+        manifest["images"] = {"tcgplayerFallback": bool(tcgplayer_images)}
     files["manifest.json"] = bundle.dumps_compact(manifest)
     files[".nojekyll"] = b""
 
     write_tree(out_dir, files)
-    return summarize(files, manifest, statuses)
+    summary = summarize(files, manifest, statuses)
+    summary["tcgplayerImages"] = sum(1 for c in index_obj.get("cards") or [] if images.is_tcgplayer_host(c.get("im")))
+    return summary
 
 
 def write_tree(out_dir, files):
@@ -571,7 +587,8 @@ def summarize(files, manifest, statuses):
     return {"date": manifest["date"], "tcgcsvBuild": manifest["tcgcsvBuild"],
             "historyStatus": statuses, "historyDays": manifest["history"]["days"],
             "dailyDates": len(manifest["daily"]["dates"]), "sizes": sizes, "total": total,
-            "affiliate": (manifest.get("links") or {}).get("tcgplayerAffiliate")}
+            "affiliate": (manifest.get("links") or {}).get("tcgplayerAffiliate"),
+            "tcgplayerSwitch": (manifest.get("images") or {}).get("tcgplayerFallback")}
 
 
 def print_summary(summary):
@@ -581,6 +598,10 @@ def print_summary(summary):
     affiliate = summary.get("affiliate")
     print("  affiliate links: %s" % ("on, " + affiliate if affiliate else
                                      "off (links.tcgplayerAffiliate \"\")" if affiliate == "" else "off (no links block)"))
+    switch = summary.get("tcgplayerSwitch")
+    print("  TCGplayer images: %s" % ("on, %d card(s)" % summary.get("tcgplayerImages", 0) if switch else
+                                      "off (images.tcgplayerFallback false)" if switch is False else
+                                      "off (no images block)"))
     for name in sorted(summary["sizes"]):
         s = summary["sizes"][name]
         print("  %-20s %4d file(s)  raw %10s  gzip %10s"
@@ -706,6 +727,8 @@ def main(argv=None):
                         "this file; '' = none)")
     b.add_argument("--links", default=LINKS,
                    help="affiliate link switch (default: links.json next to this file; missing = no links block)")
+    b.add_argument("--images", default=images.CONFIG,
+                   help="TCGplayer image switch (default: images.json next to this file; missing = no images block)")
 
     fl = sub.add_parser("floor", help="add every card of index.json files to catalog-floor.json")
     fl.add_argument("--add", nargs="+", required=True, metavar="INDEX_JSON")
@@ -728,7 +751,7 @@ def main(argv=None):
             summary = build_feed(args.bundle, args.out, previous_state(args),
                                  args.history_retention, args.daily_retention, args.allow_shrink,
                                  seeds=load_seeds(args.seed_dir), floor=load_floor(), removed=load_removed(),
-                                 links=load_links(args.links))
+                                 links=load_links(args.links), tcgplayer_images=images.load_config(args.images))
             print_summary(summary)
             return 0
         if args.cmd == "floor":

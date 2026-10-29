@@ -1,0 +1,4 @@
+{
+  "_comment": "Evodex's TCGplayer image fallback (README, TCGplayer images). true = cards with no TCGdex, pokemontcg.io or Scrydex image get TCGplayer's product photo, and the manifest says images.tcgplayerFallback true, the only state in which apps show them. false = kill switch: apps stop showing TCGplayer images at their next feed check. Client decision 2026-10-29: on (TCGplayer photos for every card with no TCGdex or pokemontcg.io/Scrydex image; the client is joining the TCGplayer affiliate program); false only if TCGplayer objects or the lawyer advises it.",
+  "tcgplayerFallback": true
+}

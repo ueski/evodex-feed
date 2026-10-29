@@ -8,6 +8,7 @@ import publish_feed
 import validate_feed
 from tests.test_publish_feed import CARDS, HOSTILE_TEMPLATES, IMPACT, make_bundle
 
+TCGP = "https://tcgplayer-cdn.tcgplayer.com/product/%d_in_1000x1000.jpg"
 DAY1 = {"42382": [[1, 95465, 1, 2, 3, 4]], "42383": [[0, 100, 1, 2, 3, 4]], "500": [[0, 25, None, None, None, None]]}
 DAY2 = {"42382": [[1, 96000, 1, 2, 3, 4]], "42383": [[1, 900, 1, 2, 3, 4]], "500": [[0, 30, None, None, None, None]]}
 
@@ -121,25 +122,75 @@ class ValidateFeedTests(unittest.TestCase):
         with open(os.path.join(feed, "manifest.json"), "w") as f:
             json.dump(m, f)
 
-    def test_tcgplayer_cdn_images_fail_the_build(self):
+    @staticmethod
+    def add_images(urls):
+        def mutate(index):
+            for card, url in zip(index["cards"], urls):
+                card["i"], card["im"] = 0, url
+        return mutate
+
+    def test_tcgplayer_cdn_images_fail_the_build_while_the_switch_is_off(self):
         f1 = self.feed("f1", "2026-10-21T20:05:22+0000", DAY1)
-
-        def add(urls):
-            def mutate(index):
-                for card, url in zip(index["cards"], urls):
-                    card["i"], card["im"] = 0, url
-            return mutate
-
-        self.rewrite_index(f1, add(["https://images.pokemontcg.io/base1/4_hires.png",
-                                    "https://images.scrydex.com/pokemon/me55c-58/large"]))
+        self.rewrite_index(f1, self.add_images(["https://images.pokemontcg.io/base1/4_hires.png",
+                                                "https://images.scrydex.com/pokemon/me55c-58/large"]))
         errors, stats = validate_feed.validate(f1, None, min_cards=1, min_products=1)
         self.assertEqual(errors, [])
         self.assertEqual(stats["imageHosts"], {"images.pokemontcg.io": 1, "images.scrydex.com": 1})
-        self.rewrite_index(f1, add(["https://tcgplayer-cdn.tcgplayer.com/product/42382_in_1000x1000.jpg"]))
+        self.assertFalse(stats["tcgplayerSwitch"])
+        self.rewrite_index(f1, self.add_images([TCGP % 42382]))
         errors = self.validate(f1)
-        self.assertTrue(any("tcgplayer-cdn.tcgplayer.com" in e for e in errors), errors)
-        self.rewrite_index(f1, add(["https://example.com/a.png", "https://images.pokemontcg.io/a/1_hires.png"]))
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("tcgplayer-cdn.tcgplayer.com while the TCGplayer image switch is off", errors[0])
+        self.rewrite_index(f1, self.add_images(["https://example.com/a.png", "https://images.pokemontcg.io/a/1_hires.png"]))
         self.assertTrue(any("allow-list" in e for e in self.validate(f1)))
+
+    def test_tcgplayer_images_pass_only_with_the_switch_on_in_images_json_and_the_manifest(self):
+        f1 = self.feed("f1", "2026-10-21T20:05:22+0000", DAY1, tcgplayer_images=True)
+        self.assertEqual(self.manifest(f1)["images"], {"tcgplayerFallback": True})
+        self.rewrite_index(f1, self.add_images([TCGP % 42382, "https://images.pokemontcg.io/base1/5_hires.png"]))
+        errors, stats = validate_feed.validate(f1, None, min_cards=1, min_products=1, tcgplayer_images=True)
+        self.assertEqual(errors, [])
+        self.assertTrue(stats["tcgplayerSwitch"])
+        self.assertEqual(stats["imageHosts"], {"tcgplayer-cdn.tcgplayer.com": 1, "images.pokemontcg.io": 1})
+        # images.json off (or missing) while the manifest says on: the manifest disagrees and the images fail
+        errors = self.validate(f1)
+        self.assertTrue(any("images.json says false" in e for e in errors), errors)
+        self.assertTrue(any("switch is off" in e for e in errors), errors)
+        # the manifest off (or without the block) while images.json says on: same
+        for block in ({"tcgplayerFallback": False}, None):
+            self.rewrite_manifest(f1, lambda m, b=block: m.update(images=b) if b else m.pop("images", None))
+            errors = self.validate(f1, tcgplayer_images=True)
+            self.assertTrue(any("manifest images.tcgplayerFallback is false" in e for e in errors), errors)
+            self.assertTrue(any("switch is off" in e for e in errors), errors)
+
+    def test_tcgplayer_images_must_have_the_exact_shape_no_tcgdex_image_and_the_first_product(self):
+        f1 = self.feed("f1", "2026-10-21T20:05:22+0000", DAY1, tcgplayer_images=True)
+        cases = {
+            "not of the form": ["http://tcgplayer-cdn.tcgplayer.com/product/42382_in_1000x1000.jpg"],
+            "first product": [TCGP % 42383],
+        }
+        for needle, urls in cases.items():
+            self.rewrite_index(f1, self.add_images(urls))
+            errors = self.validate(f1, tcgplayer_images=True)
+            self.assertTrue(any(needle in e for e in errors), (needle, errors))
+
+        def tcgdex_image_too(index):
+            index["cards"][0]["im"] = TCGP % 42382
+            index["cards"][0].pop("i", None)
+        self.rewrite_index(f1, tcgdex_image_too)
+        self.assertTrue(any("cards that have a TCGdex image" in e for e in self.validate(f1, tcgplayer_images=True)))
+
+    def test_images_block_is_optional_and_checked(self):
+        f1 = self.feed("f1", "2026-10-21T20:05:22+0000", DAY1, tcgplayer_images=False)
+        self.assertEqual(self.manifest(f1)["images"], {"tcgplayerFallback": False})
+        self.assertEqual(self.validate(f1), [])
+        for block in ({}, {"future": 1}):
+            self.rewrite_manifest(f1, lambda m, b=block: m.update(images=b))
+            self.assertEqual(self.validate(f1), [], block)
+        for block, needle in ((["x"], "images must be an object"), ({"tcgplayerFallback": "yes"}, "true or false"),
+                              ({"tcgplayerFallback": 1}, "true or false")):
+            self.rewrite_manifest(f1, lambda m, b=block: m.update(images=b))
+            self.assertTrue(any(needle in e for e in self.validate(f1)), block)
 
     def test_custom_tcgdex_image_base_must_stay_on_tcgdex(self):
         f1 = self.feed("f1", "2026-10-21T20:05:22+0000", DAY1)

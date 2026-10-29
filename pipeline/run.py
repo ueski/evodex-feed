@@ -13,8 +13,9 @@ The pipeline lives in two repositories with identical files: the Evodex app
 
 Steps: TCGdex catalog -> name fixes -> TCGCSV groups/products/prices -> set
 mapping -> card matching -> variants + prices -> validation against TCGdex's
-own TCGplayer ids -> fallback images -> species (dx, species.json) ->
-coverage report -> bundle/price files + sizes -> history.
+own TCGplayer ids -> fallback images (TCGplayer photos last, only while
+images.json switches them on) -> species (dx, species.json) -> coverage report
+-> bundle/price files + sizes -> history.
 """
 
 import argparse
@@ -147,21 +148,28 @@ def check_image_urls(urls, status_cache, offline, workers=4):
     A host with a placeholder probe (images.PLACEHOLDER_PROBES: Scrydex answers
     200 with a card back for unknown ids) is probed once first; a 200 with the
     probe's ETag is recorded as 404 ("placeholder"). If the probe itself fails,
-    that host's URLs are not checked this run (their cached status stays)."""
+    that host's URLs are not checked this run (their cached status stays).
+    For images.ETAG_HOSTS (TCGplayer) the entry also keeps the ETag
+    ([code, time, "", etag]) for images.stock_etags. Each host gets its own
+    pace (images.HEAD_INTERVAL, else 10 HEAD/s)."""
     now = time.time()
 
     def fresh(u):
         e = status_cache.get(u)
         if not e:
             return False
-        return offline or now - e[1] <= (90 if e[0] == 200 else 7) * 86400
+        if offline:
+            return True
+        if e[0] == 200 and len(e) < 4 and urllib.parse.urlparse(u).netloc in images.ETAG_HOSTS:
+            return False    # a 200 recorded before its ETag was kept (images.stock_etags needs it)
+        return now - e[1] <= (90 if e[0] == 200 else 7) * 86400
 
     todo = sorted({u for u in urls if u and not fresh(u)})
     if offline or not todo:
         return 0
     # <= 10 HEAD/s per host; built up front so the worker threads only read it
     hosts = {urllib.parse.urlparse(u).netloc for u in todo}
-    limiters = {host: net.RateLimiter(0.1) for host in hosts}
+    limiters = {host: net.RateLimiter(images.HEAD_INTERVAL.get(host, 0.1)) for host in hosts}
     signatures = {}
     for host in sorted(hosts & set(images.PLACEHOLDER_PROBES)):
         code, headers = net.http_head(images.PLACEHOLDER_PROBES[host], limiter=limiters[host])
@@ -175,6 +183,8 @@ def check_image_urls(urls, status_cache, offline, workers=4):
         code, headers = net.http_head(u, limiter=limiters[host])
         if code == 200 and images.is_placeholder(headers, signatures.get(host)):
             return [404, int(now), "placeholder"]
+        if host in images.ETAG_HOSTS:
+            return [code, int(now), "", headers.get("etag") or ""]
         return [code, int(now)]
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -185,10 +195,12 @@ def check_image_urls(urls, status_cache, offline, workers=4):
     return len(todo)
 
 
-def add_image_fallbacks(args, overrides, physical, cards_out):
+def add_image_fallbacks(args, overrides, physical, cards_out, tcgplayer=False):
     """For cards without a TCGdex image (images.py): a TCGdex twin's image
     (c["image"], c["imageTwin"]), else c["imageFallback"] = {"source", "url"}
-    from pokemontcg.io / Scrydex. Returns the report block for summary.json."""
+    from pokemontcg.io / Scrydex, else (only with ``tcgplayer``, the
+    images.json switch) the TCGplayer photo of the card's deep-link product.
+    Returns the report block for summary.json."""
     need = [c for c in cards_out if not c.get("image")]
     twins = images.twin_images([
         {"id": c["id"], "localId": c["localId"], "name": c["name"], "image": c.get("image"),
@@ -234,6 +246,12 @@ def add_image_fallbacks(args, overrides, physical, cards_out):
 
     candidates = {c["id"]: images.candidates(ptcg_hit[c["id"]]) if c["id"] in ptcg_hit else []
                   for c in still}
+    if tcgplayer:
+        # last resort: the deep-link product's photo (index.json p[0].id, the app's TCGplayerLinks target)
+        for c in still:
+            url = images.tcgplayer_url((c.get("tcgplayer") or {}).get("productId"))
+            if url:
+                candidates[c["id"]].append(("tcgplayer", url))
 
     status_path = os.path.join(args.cache, "images", "status.json")
     status_cache = load_image_status(status_path)
@@ -243,30 +261,38 @@ def add_image_fallbacks(args, overrides, physical, cards_out):
         settled = set()
         for rank in range(max((len(cs) for cs in candidates.values()), default=0)):
             todo = [cs[rank][1] for cid, cs in candidates.items() if cid not in settled and rank < len(cs)]
-            checked += check_image_urls([u for u in todo if images.allowed(u)], status_cache, offline)
+            checked += check_image_urls([u for u in todo if images.allowed(u, tcgplayer)], status_cache, offline)
             settled |= {cid for cid, cs in candidates.items()
-                        if rank < len(cs) and cs[rank][1] and images.allowed(cs[rank][1])
+                        if rank < len(cs) and cs[rank][1] and images.allowed(cs[rank][1], tcgplayer)
                         and (status_cache.get(cs[rank][1]) or [200])[0] == 200}
         if checked:
             net._atomic_write(status_path, json.dumps(status_cache, sort_keys=True, indent=0).encode("utf-8"))
 
+    # TCGplayer stock pictures (placeholders): one file under differently named cards' products
+    stock = images.stock_etags(status_cache, {v["productId"]: c["name"] for c in cards_out
+                                              for v in (c.get("tcgplayer") or {}).get("variants", [])})
+
+    def is_placeholder(url):
+        e = status_cache.get(url) or []
+        return (len(e) > 2 and e[2] == "placeholder") or (len(e) > 3 and e[0] == 200 and e[3] in stock)
+
     def status(url):
         e = status_cache.get(url)
-        return e[0] if e else None
+        return (404 if is_placeholder(url) else e[0]) if e else None
 
     counts = defaultdict(int)
     failed = defaultdict(int)       # candidates rejected by the HEAD check, per source
-    placeholders = 0                # ... of which Scrydex card-back placeholders
+    placeholders = defaultdict(int)  # ... of which placeholders (Scrydex card back, TCGplayer stock pictures)
     unchecked = defaultdict(int)    # chosen without a recorded status (offline, never checked)
     uncovered = defaultdict(list)
     for c in still:
         for source, url in candidates[c["id"]]:
             if url and status(url) not in (None, 200):
                 failed[source] += 1
-                placeholders += len(status_cache[url]) > 2 and status_cache[url][2] == "placeholder"
-        source, url = images.choose(candidates[c["id"]], status)
+                placeholders[source] += is_placeholder(url)
+        source, url = images.choose(candidates[c["id"]], status, tcgplayer)
         if url:
-            assert images.allowed(url), url
+            assert images.allowed(url, tcgplayer), url
             c["imageFallback"] = {"source": source, "url": url}
             counts[source] += 1
             if status(url) is None:
@@ -282,8 +308,10 @@ def add_image_fallbacks(args, overrides, physical, cards_out):
         "cards": total, "tcgdex": total - len(need), "withoutTcgdex": len(need),
         "tcgdexTwin": len(twin_of), "twins": dict(sorted(twin_of.items())),
         "fallback": {s: counts[s] for s in images.SOURCES}, "none": counts["none"],
+        "tcgplayerSwitch": bool(tcgplayer),
         "coveredPct": pct(total - counts["none"], total),
-        "headChecked": checked, "rejectedByHead": dict(failed), "placeholders": placeholders,
+        "headChecked": checked, "rejectedByHead": dict(failed), "placeholders": dict(placeholders),
+        "tcgplayerStockEtags": sorted(stock),
         "chosenUnchecked": dict(unchecked),
         "ptcgioSources": dict(sorted(ptcg.sources.items())),
         "setMap": {sid: {"ptcgioSet": set_map.get(sid, (None, "none"))[0],
@@ -293,6 +321,8 @@ def add_image_fallbacks(args, overrides, physical, cards_out):
                          "ptcgio": sum(1 for c in cs if (c.get("imageFallback") or {}).get("source") == "ptcgio"),
                          "scrydex": sum(1 for c in cs
                                         if (c.get("imageFallback") or {}).get("source") == "scrydex"),
+                         "tcgplayer": sum(1 for c in cs
+                                          if (c.get("imageFallback") or {}).get("source") == "tcgplayer"),
                          "none": len(uncovered.get(sid, []))}
                    for sid, cs in sorted(need_by_set.items())},
         "uncovered": {sid: ids for sid, ids in sorted(uncovered.items())},
@@ -354,6 +384,7 @@ def add_species(args, overrides, cards_out, set_meta):
 def build(args):
     t0 = time.time()
     overrides = load_overrides()
+    tcgplayer_images = bool(images.load_config(args.images_config))
     only = set(args.sets.split(",")) if args.sets else None
 
     log("TCGdex catalog ...")
@@ -533,10 +564,10 @@ def build(args):
 
     # ---- fallback images for cards TCGdex has no scan for (images.py)
     log("Fallback images ...")
-    image_report = add_image_fallbacks(args, overrides, physical, cards_out)
-    log("  %d without TCGdex image: TCGdex twin %d, %s, none %d  (%s)" % (
+    image_report = add_image_fallbacks(args, overrides, physical, cards_out, tcgplayer_images)
+    log("  %d without TCGdex image: TCGdex twin %d, %s, none %d; TCGplayer switch %s  (%s)" % (
         image_report["withoutTcgdex"], image_report["tcgdexTwin"], image_report["fallback"],
-        image_report["none"], net.STATS))
+        image_report["none"], "on" if tcgplayer_images else "off", net.STATS))
 
     # ---- species: dx on Pokémon cards + species.json (species.py)
     log("Species ...")
@@ -855,17 +886,18 @@ def render_report(summary, cov, map_report, set_meta):
     im = summary["images"]
     a("## Images\n")
     a("TCGdex image: %d of %d cards. Without one: %d; a TCGdex twin's image %d, fallback from "
-      "pokemontcg.io %d, from Scrydex (same pokemontcg.io id) %d, none %d. Cards with some image: %.1f%%. "
-      "HEAD checks this run: %d; candidates rejected by the check: %s (Scrydex placeholders: %d); chosen "
-      "without a recorded check: %s.\n" % (
+      "pokemontcg.io %d, from Scrydex (same pokemontcg.io id) %d, from TCGplayer (switch %s) %d, none %d. "
+      "Cards with some image: %.1f%%. HEAD checks this run: %d; candidates rejected by the check: %s "
+      "(placeholders: %s; TCGplayer stock-picture ETags: %d); chosen without a recorded check: %s.\n" % (
           im["tcgdex"], im["cards"], im["withoutTcgdex"], im["tcgdexTwin"], im["fallback"]["ptcgio"],
-          im["fallback"]["scrydex"], im["none"], im["coveredPct"], im["headChecked"],
-          im["rejectedByHead"] or "none", im["placeholders"], im["chosenUnchecked"] or "none"))
-    a("| Set | No TCGdex image | pokemontcg.io set | TCGdex twin | pokemontcg.io | Scrydex | none |")
-    a("|---|---:|---|---:|---:|---:|---:|")
+          im["fallback"]["scrydex"], "on" if im["tcgplayerSwitch"] else "off", im["fallback"]["tcgplayer"],
+          im["none"], im["coveredPct"], im["headChecked"], im["rejectedByHead"] or "none",
+          im["placeholders"] or "none", len(im["tcgplayerStockEtags"]), im["chosenUnchecked"] or "none"))
+    a("| Set | No TCGdex image | pokemontcg.io set | TCGdex twin | pokemontcg.io | Scrydex | TCGplayer | none |")
+    a("|---|---:|---|---:|---:|---:|---:|---:|")
     for sid, r in im["setMap"].items():
-        a("| %s | %d | %s | %d | %d | %d | %d |" % (sid, r["cards"], r["ptcgioSet"] or "-", r["twin"],
-                                                   r["ptcgio"], r["scrydex"], r["none"]))
+        a("| %s | %d | %s | %d | %d | %d | %d | %d |" % (sid, r["cards"], r["ptcgioSet"] or "-", r["twin"],
+                                                        r["ptcgio"], r["scrydex"], r["tcgplayer"], r["none"]))
     sp = summary["species"]
     a("\n## Species\n")
     a("%d species (PokéAPI; by generation %s). Pokémon cards with dx: %d of %d (%d with several species). "
@@ -917,6 +949,8 @@ def main(argv=None):
                     help="do not fill gaps with TCGdex's own TCGplayer ids")
     ap.add_argument("--history-sample-group", type=int, default=23237,
                     help="TCGplayer group used for the history size projection (default: 151)")
+    ap.add_argument("--images-config", default=images.CONFIG,
+                    help="TCGplayer image switch (default: images.json next to this file; missing = off)")
     ap.add_argument("--cache", default=os.path.join(HERE, "cache"))
     ap.add_argument("--out", default=os.path.join(HERE, "out"))
     args = ap.parse_args(argv)

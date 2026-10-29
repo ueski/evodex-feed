@@ -616,6 +616,59 @@ class AffiliateLinksTests(unittest.TestCase):
             self.assertIsNone(links)
 
 
+class TCGplayerImageSwitchTests(unittest.TestCase):
+    """images.json -> manifest images.tcgplayerFallback, the app's kill switch for TCGplayer photos (v0.3.4)."""
+    TCGP = "https://tcgplayer-cdn.tcgplayer.com/product/42382_in_1000x1000.jpg"
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp)
+
+    def bundle(self, im=None):
+        cards = [dict(c) for c in CARDS]
+        if im:
+            cards[0].update(i=0, im=im)
+        return make_bundle(os.path.join(self.tmp, "b"), "2026-10-21T20:05:22+0000", cards,
+                           {"42382": [[1, 95465, 1, 2, 3, 4]]})
+
+    def test_manifest_has_images_only_when_configured(self):
+        bundle_dir = self.bundle()
+        for switch in (None, False, True):
+            out = os.path.join(self.tmp, "feed")
+            summary = publish_feed.build_feed(bundle_dir, out, publish_feed.NoPrevious(), tcgplayer_images=switch)
+            manifest = read(os.path.join(out, "manifest.json"))
+            self.assertEqual("images" in manifest, switch is not None)
+            if switch is not None:
+                self.assertEqual(manifest["images"], {"tcgplayerFallback": switch})
+            self.assertEqual(summary["tcgplayerSwitch"], switch)
+            self.assertEqual(summary["tcgplayerImages"], 0)
+
+    def test_a_tcgplayer_image_needs_the_switch(self):
+        bundle_dir = self.bundle(self.TCGP)
+        out = os.path.join(self.tmp, "feed")
+        summary = publish_feed.build_feed(bundle_dir, out, publish_feed.NoPrevious(), tcgplayer_images=True)
+        self.assertEqual(summary["tcgplayerImages"], 1)
+        for switch in (None, False):
+            with self.assertRaises(publish_feed.PublishError) as e:
+                publish_feed.build_feed(bundle_dir, out, publish_feed.NoPrevious(), tcgplayer_images=switch)
+            self.assertIn("switch is off", str(e.exception))
+
+    def test_cli_reads_images_json(self):
+        bundle_dir = self.bundle(self.TCGP)
+        out = os.path.join(self.tmp, "feed")
+        self.addCleanup(setattr, publish_feed, "load_floor", publish_feed.load_floor)
+        publish_feed.load_floor = lambda *a, **k: set()
+        config = os.path.join(self.tmp, "images.json")
+        args = ["build", "--bundle", bundle_dir, "--out", out, "--seed-dir", "", "--images", config]
+        for text, code in (('{"tcgplayerFallback": true}', 0), ('{"tcgplayerFallback": false}', 1),
+                           ('{"tcgplayerFallback": "yes"}', 1)):
+            with open(config, "w") as f:
+                f.write(text)
+            self.assertEqual(publish_feed.main(args), code, text)
+        self.assertEqual(read(os.path.join(out, "manifest.json"))["images"], {"tcgplayerFallback": True},
+                         "a refused build leaves the previous output untouched")
+
+
 class CheckTests(unittest.TestCase):
     NOW = datetime.datetime(2026, 10, 22, 21, 15, tzinfo=datetime.timezone.utc)
 

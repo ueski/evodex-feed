@@ -19,9 +19,9 @@ no app code here.
 
 | What | Source | Notes |
 |---|---|---|
-| Prices (market, low, mid, high, direct low; USD) | **TCGplayer**, via [TCGCSV](https://tcgcsv.com) | TCGCSV mirrors TCGplayer's catalog and prices once a day. The prices are TCGplayer's data. TCGplayer is credited for **prices only**: no TCGplayer images are used. Thank you, TCGCSV. |
+| Prices (market, low, mid, high, direct low; USD) | **TCGplayer**, via [TCGCSV](https://tcgcsv.com) | TCGCSV mirrors TCGplayer's catalog and prices once a day. The prices are TCGplayer's data. Thank you, TCGCSV. |
 | Cards, sets, numbers, rarities, image URLs | [TCGdex](https://tcgdex.dev) (`api.tcgdex.net`) | Open-source card database. Thank you, TCGdex. |
-| Fallback image URLs (cards TCGdex has no image for) | A TCGdex scan of the same card listed twice by TCGdex, else [pokemontcg.io](https://pokemontcg.io) / Scrydex **only** (`images.pokemontcg.io`, `images.scrydex.com`) | URLs only; no images are stored here. A card is matched to pokemontcg.io by set, number and name; when pokemontcg.io's file is missing, Scrydex's file of the same card id is used after a check that it is not Scrydex's card-back placeholder. Cards without a verified source get none. |
+| Fallback image URLs (cards TCGdex has no image for) | A TCGdex scan of the same card listed twice by TCGdex, else [pokemontcg.io](https://pokemontcg.io) / Scrydex (`images.pokemontcg.io`, `images.scrydex.com`), else, **only while `pipeline/images.json` switches it on**, the card's **TCGplayer** product photo (`tcgplayer-cdn.tcgplayer.com`) | URLs only; no images are stored here. A card is matched to pokemontcg.io by set, number and name; when pokemontcg.io's file is missing, Scrydex's file of the same card id is used after a check that it is not Scrydex's card-back placeholder. TCGplayer photos are the last resort and sit behind a kill switch (see "TCGplayer images"); while it is on, TCGplayer is credited for some card images. Cards without a verified source get none. |
 | National Dex species per card (`dx`) | [PokéAPI](https://pokeapi.co) static CSV export | Read at most every 30 days from GitHub, never from the REST API. |
 
 **Notice.** Pokémon and all card names, card text, set names, artwork and images are © Nintendo,
@@ -75,7 +75,7 @@ will be uploaded. Either one failing stops the run:
 | TCGCSV build not older than the previous feed's | Never go back in time. |
 | History carried over: no fewer days, no lost daily snapshots, no lost history files | A run that lost its state would otherwise publish a feed with its history wiped. |
 | First run: ≥ 15,000 cards and ≥ 15,000 products, one day of data plus history seeds only | There is nothing to compare the first day with. |
-| Fallback images (`im` in `index.json`) only on `images.pokemontcg.io` / `images.scrydex.com`, custom TCGdex image bases (`i`) only on `assets.tcgdex.net`; any `tcgplayer-cdn.tcgplayer.com` URL fails the run | TCGplayer images are not used (IP decision); TCGplayer is a price source only. |
+| Fallback images (`im` in `index.json`) only on `images.pokemontcg.io` / `images.scrydex.com`, plus `tcgplayer-cdn.tcgplayer.com` **only while `pipeline/images.json` is on**, only on cards without a TCGdex image, only as `…/product/<the card's first product>_in_1000x1000.jpg`; the manifest's `images.tcgplayerFallback` must say what `images.json` says; custom TCGdex image bases (`i`) only on `assets.tcgdex.net` | TCGplayer photos come after TCGdex and pokemontcg.io / Scrydex (client decision 2026-10-29) and sit behind the insurance switch; with it off, a TCGplayer URL fails the run. |
 | `daily/` and `history/` match the manifest exactly; every series as long as its dates; no file > 100 MB, site < 1 GB | Structural integrity and GitHub Pages limits. |
 
 After checking what changed, a shrink can be accepted once with **Run workflow → allow_shrink**. A card that
@@ -193,6 +193,9 @@ tens of KB after a year.
 * `daily.dates` is ascending and lists exactly the files present.
 * `links` (optional, Evodex 0.3.1+): `{"tcgplayerAffiliate": "<template>"}` switches the app's TCGplayer
   affiliate links on; absent = off. See "Affiliate links".
+* `images` (optional, Evodex 0.3.4+): `{"tcgplayerFallback": true}` lets the app show TCGplayer product photos;
+  absent, `false` or anything else = off, even for an `index.json` the app cached earlier. Written from
+  `pipeline/images.json`. See "TCGplayer images".
 * Adding keys keeps `v: 1`; a breaking change bumps `v`, and apps ignore a `v` they don't know.
 
 ### prices.json / prices-market.json
@@ -212,7 +215,8 @@ Rows are `[subTypeIdx, market, low, mid, high, directLow]` in integer US cents (
 The card catalog (sets, cards, numbers, rarities, TCGplayer product ids and printings, image
 URLs, species), in the compact format documented in [`pipeline/bundle.py`](pipeline/bundle.py). Images: a card
 without `i` uses TCGdex's standard path; `"i": "<url>"` is another TCGdex image base (a TCGdex twin's scan);
-`"i": 0` plus `"im"` is a complete pokemontcg.io / Scrydex file; `"i": 0` alone means no image. The catalog only
+`"i": 0` plus `"im"` is a complete pokemontcg.io / Scrydex file (or, behind the switch, a TCGplayer product
+photo); `"i": 0` alone means no image. The catalog only
 grows (see "Guards").
 
 ### history/&lt;setId&gt;.json
@@ -242,6 +246,9 @@ That day's `prices-market.json`, unchanged, for the last 90 price dates.
 * **pokemontcg.io:** at most 30 requests/minute, 7-day cache, only sets that need a fallback image.
   **Image CDNs** (pokemontcg.io / Scrydex): one HEAD per new fallback URL, ≤ 10/s per host, results cached;
   plus one HEAD of an id Scrydex cannot have, per run that checks Scrydex URLs (its placeholder's ETag).
+* **TCGplayer's image CDN** (only while `pipeline/images.json` is on): one HEAD per new product photo, at most 4/s,
+  same identifiable User-Agent, results cached (about 674 HEADs on the first run with the switch on, then only new
+  cards). A product without a photo answers 403 and simply gets none.
 * The HTTP cache (`pipeline/cache/`) is kept between runs with `actions/cache`; losing it only
   makes the next run cold (~35 min, ~22k TCGdex requests).
 
@@ -271,12 +278,36 @@ changed by a typo. The app accepts nothing else either, so even a tampered feed 
 to another site. To switch off: `null` (no `links` block) or `""` (an explicit "off" that also
 overrides a template built into an app version), then rebuild as in step 2.
 
+## TCGplayer images
+
+Client decision 2026-10-29: **TCGplayer product photos are used for every card with no TCGdex or pokemontcg.io /
+Scrydex image** (about 514 cards); Evodex is a commercial app and the client is joining the TCGplayer affiliate
+program. TCGdex and pokemontcg.io / Scrydex stay first: their scans are better. The **kill switch is insurance only**:
+it stays on, and goes off only if TCGplayer objects or the lawyer advises it. It lives only in this repository:
+`pipeline/images.json` (feed-only; the app repository's `feed_sync.py copy` never touches it; a missing file is off).
+
+* **On** (`{"tcgplayerFallback": true}`): `run.py` adds `https://tcgplayer-cdn.tcgplayer.com/product/<id>_in_1000x1000.jpg`
+  (the card's deep-link product) to those cards after a HEAD answered 200, and the manifest says
+  `"images":{"tcgplayerFallback":true}`. Evodex 0.3.4+ shows them only while the last manifest it fetched says so, and
+  credits TCGplayer for some card images in About.
+* **Off, the kill switch (only if TCGplayer objects or the lawyer advises it):**
+  1. Set `pipeline/images.json` → `"tcgplayerFallback": false`.
+  2. Commit to `main`, then `gh workflow run price-feed.yml -f force=true`.
+  3. Check `curl -s https://ueski.github.io/evodex-feed/manifest.json` shows `"images":{"tcgplayerFallback":false}`.
+
+  Apps stop loading TCGplayer images at their next feed check, without an app update, even before they download
+  the new `index.json` (which no longer names them), and delete the ones they cached.
+* `publish_feed.py build` and `validate_feed.py` stop the run if `index.json` has a TCGplayer image while the switch
+  is off, on a card with a TCGdex image, in any other URL shape or for another product, or if the manifest and
+  `images.json` disagree.
+
 ## Operations
 
 | Task | How |
 |---|---|
 | Turn the feed off / on | `gh workflow disable "Price feed"` / `gh workflow enable "Price feed"` |
 | Switch affiliate links on / off | `pipeline/links.json` `tcgplayerAffiliate`, then `gh workflow run price-feed.yml -f force=true` ("Affiliate links") |
+| Switch TCGplayer images on / off (kill switch) | `pipeline/images.json` `tcgplayerFallback`, then `gh workflow run price-feed.yml -f force=true` ("TCGplayer images") |
 | Run now | `gh workflow run price-feed.yml` (add `-f force=true` to rebuild the same TCGCSV build) |
 | Accept a sharp shrink once | `gh workflow run price-feed.yml -f allow_shrink=true` |
 | Undo a bad day | Revert the day's commit on `data` (`git revert`, push), then `gh workflow run price-feed.yml -f force=true` |
@@ -307,9 +338,10 @@ each scheduled run re-enables the workflow to keep the schedule alive.
 | `pipeline/catalog-floor.json` | Every card a shipped app catalog contains; `index.json` must always contain them |
 | `pipeline/history-seed/` | One-time history seeds (feed-only; see "History and state") |
 | `pipeline/links.json` | The affiliate-link switch (feed-only; see "Affiliate links") |
+| `pipeline/images.json` | The TCGplayer image switch (feed-only; see "TCGplayer images") |
 | `pipeline/tests/` | `python3 -m unittest` |
 
-Everything in `pipeline/` except `history-seed/` and `links.json` is a byte-identical copy of the shared files in the Evodex app
+Everything in `pipeline/` except `history-seed/`, `links.json` and `images.json` is a byte-identical copy of the shared files in the Evodex app
 repository's `tools/pipeline/`, which is the source of truth (its `feed_sync.py check` / `copy` lists them). Make
 pipeline changes there and copy them here, so the bundled catalog and the nightly one come from the same code.
 

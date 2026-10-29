@@ -17,9 +17,13 @@ It re-reads exactly the bytes that will be uploaded and checks:
 * links (optional, v0.3.1): an object; links.tcgplayerAffiliate null, "" (off) or a template the
   app accepts (https, "{url}" exactly once, host tcgplayer.pxf.io / www.tcgplayer.com /
   tcgplayer.com; publish_feed.affiliate_template_problem);
-* index.json fallback images (``im``): pokemontcg.io / Scrydex hosts only, never
-  tcgplayer-cdn.tcgplayer.com (TCGplayer is a price source only); a custom TCGdex
-  image base (``"i": "<url>"``, a TCGdex twin's scan) only on assets.tcgdex.net;
+* images (optional, v0.3.4): an object; images.tcgplayerFallback true or false, and the same as
+  the switch in images.json (missing file = off; --images);
+* index.json fallback images (``im``): pokemontcg.io / Scrydex hosts, plus TCGplayer product
+  photos only while that switch is on, only on cards with ``"i": 0``, only in the exact shape
+  https://tcgplayer-cdn.tcgplayer.com/product/<p[0].id>_in_1000x1000.jpg
+  (images.tcgplayer_image_problems); a custom TCGdex image base (``"i": "<url>"``, a TCGdex
+  twin's scan) only on assets.tcgdex.net;
 * cards are only ever added: every card of the previous feed's index.json and of
   catalog-floor.json is still there, unless overrides.json "removedCards" lists it
   (--allow-shrink does not change this);
@@ -49,7 +53,6 @@ import images  # noqa: E402
 import net  # noqa: E402
 import publish_feed  # noqa: E402
 
-TCGPLAYER_IMAGE_HOST = "tcgplayer-cdn.tcgplayer.com"   # never an image source (IP decision 2026-10-29)
 ROOT_FILES = {"manifest.json", "index.json", "prices.json", "prices-market.json", ".nojekyll"}
 MAX_FILE_BYTES = 100 * 1000 * 1000
 MAX_SITE_BYTES = 1000 * 1000 * 1000
@@ -82,10 +85,11 @@ def _json(r, blob, name):
 
 
 def validate(site, previous_manifest=None, allow_shrink=False, min_cards=15000, min_products=15000,
-             required_cards=(), seed_dates=()):
+             required_cards=(), seed_dates=(), tcgplayer_images=False):
     """Returns (errors, stats). ``previous_manifest`` None = first run (bootstrap).
     ``required_cards``: card ids index.json must contain (publish_feed.required_cards);
-    ``seed_dates``: dates of the history seeds (the only days a first run may have besides its own)."""
+    ``seed_dates``: dates of the history seeds (the only days a first run may have besides its own);
+    ``tcgplayer_images``: the images.json switch (images.load_config; None or False = off)."""
     r = Report()
     stats = {"sizes": {}}
     mpath = os.path.join(site, "manifest.json")
@@ -106,6 +110,19 @@ def validate(site, previous_manifest=None, allow_shrink=False, min_cards=15000, 
             problem = None if template is None else publish_feed.affiliate_template_problem(template)
             r.expect(problem is None, "manifest links.tcgplayerAffiliate %s" % problem)
             stats["affiliate"] = template
+    # The TCGplayer image switch: the manifest says what images.json says (missing block = off).
+    switch = False
+    if "images" in m:
+        block = m["images"]
+        if r.expect(isinstance(block, dict), "manifest images must be an object, not %r" % (block,)):
+            value = block.get("tcgplayerFallback", False)
+            if r.expect(isinstance(value, bool), "manifest images.tcgplayerFallback must be true or false, not %r"
+                        % (value,)):
+                switch = value
+    r.expect(switch == bool(tcgplayer_images), "manifest images.tcgplayerFallback is %s but images.json says %s"
+             % (str(switch).lower(), str(bool(tcgplayer_images)).lower()))
+    switch = switch and bool(tcgplayer_images)
+    stats["tcgplayerSwitch"] = switch
 
     # ---- latest files: sha256, bytes, counts
     blobs, objs = {}, {}
@@ -132,15 +149,16 @@ def validate(site, previous_manifest=None, allow_shrink=False, min_cards=15000, 
                  % (cards, m["index"].get("cards")))
         r.expect(m["index"].get("sets") == len(sets), "index.json has %d sets, manifest says %r"
                  % (len(sets), m["index"].get("sets")))
-        # Fallback images ("im"): pokemontcg.io / Scrydex only. TCGplayer is credited for prices only.
-        ims = [c.get("im") for c in index.get("cards") or [] if c.get("im")]
+        # Fallback images ("im"): pokemontcg.io / Scrydex, and TCGplayer only behind the switch.
+        cards_list = index.get("cards") or []
+        ims = [c.get("im") for c in cards_list if c.get("im")]
         hosts = {}
         for u in ims:
-            host = urllib.parse.urlparse(u).netloc
+            host = urllib.parse.urlparse(u).netloc if isinstance(u, str) else repr(u)
             hosts[host] = hosts.get(host, 0) + 1
-        r.expect(not hosts.get(TCGPLAYER_IMAGE_HOST), "index.json: %d card images (im) on %s; TCGplayer images "
-                 "must not be used" % (hosts.get(TCGPLAYER_IMAGE_HOST, 0), TCGPLAYER_IMAGE_HOST))
-        off_list = [u for u in ims if not images.allowed(u)]
+        for problem in images.tcgplayer_image_problems(cards_list, switch):
+            r.fail("index.json: " + problem)
+        off_list = [u for u in ims if not images.allowed(u) and not images.is_tcgplayer_host(u)]
         r.expect(not off_list, "index.json: %d im URLs off the allow-list %s, e.g. %s"
                  % (len(off_list), list(images.ALLOWED_HOSTS), off_list[:1]))
         stats["imageHosts"] = hosts
@@ -291,6 +309,8 @@ def print_stats(stats):
     print("  fallback images (im) by host: %s; TCGdex twin images (i): %d; cards that must stay: %d"
           % (stats.get("imageHosts") or "none", stats.get("customImages", 0), stats.get("requiredCards", 0)))
     print("  affiliate links: %s" % ("on, " + stats["affiliate"] if stats.get("affiliate") else "off"))
+    print("  TCGplayer images: %s" % ("on, %d card(s)" % (stats.get("imageHosts") or {}).get(
+        images.TCGPLAYER_IMAGE_HOST, 0) if stats.get("tcgplayerSwitch") else "off"))
     for name in sorted(stats["sizes"]):
         s = stats["sizes"][name]
         print("  %-20s %4d file(s)  raw %10s  gzip %10s"
@@ -311,17 +331,21 @@ def main(argv=None):
     ap.add_argument("--min-cards", type=int, default=15000, help="first-run floor (default 15000)")
     ap.add_argument("--min-products", type=int, default=15000, help="first-run floor (default 15000)")
     ap.add_argument("--seed-dir", default=publish_feed.SEED_DIR, help="history seeds (as publish_feed.py build)")
+    ap.add_argument("--images", default=images.CONFIG,
+                    help="TCGplayer image switch (as publish_feed.py build; default: images.json next to this file)")
     args = ap.parse_args(argv)
     try:
         state = publish_feed.previous_state(args)
         previous = state.manifest
         required = publish_feed.required_cards(state.index(), publish_feed.load_floor(), publish_feed.load_removed())
         seed_dates = [d for d, _ in publish_feed.load_seeds(args.seed_dir)]
+        tcgplayer_images = images.load_config(args.images)
     except (publish_feed.PublishError, net.FetchError, ValueError) as e:
-        sys.stderr.write("[validate_feed] error: cannot read the previous feed or the history seeds: %s\n" % e)
+        sys.stderr.write("[validate_feed] error: cannot read the previous feed, the history seeds or "
+                         "images.json: %s\n" % e)
         return 1
     errors, stats = validate(args.site, previous, args.allow_shrink, args.min_cards, args.min_products,
-                             required, seed_dates)
+                             required, seed_dates, tcgplayer_images)
     print_stats(stats)
     if errors:
         for e in errors:

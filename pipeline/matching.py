@@ -1,6 +1,6 @@
 """Card <-> TCGplayer product matching inside one mapped set.
 
-Pseudo-code (mirrored in data-sources.md in the Evodex app repository so the app can
+Pseudo-code (mirrored in the app repository's docs/architecture/data-sources.md so the app can
 port it to Swift):
 
     pool  = card products of the groups mapped to the set

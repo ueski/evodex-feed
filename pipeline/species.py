@@ -1,6 +1,6 @@
 """Species list (National Dex) and card -> species mapping (pure functions).
 
-species.json (bundled, small, see data-sources.md in the Evodex app repository "Species / Dex")
+species.json (bundled, small, see the app repository's docs/architecture/data-sources.md "Species / Dex")
     {"v": 1,
      "generations": [{"g": 1, "n": "I", "region": "Kanto", "from": 1, "to": 151}, ...],
      "types": ["Bug", "Dark", ...],                  # game types, string table

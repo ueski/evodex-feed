@@ -109,10 +109,11 @@ def http_get(url, limiter=None, retries=4, timeout=30, data=None, headers=None):
         time.sleep(delay + random.uniform(0, 0.5))
 
 
-def http_status(url, limiter=None, retries=3, timeout=30):
-    """HEAD ``url`` and return the HTTP status code (200, 403, 404 ...).
-    Retries network errors, 429 and 5xx; returns the last status (or 0 for a
-    network failure) instead of raising, so callers can record it."""
+def http_head(url, limiter=None, retries=3, timeout=30):
+    """HEAD ``url`` and return ``(status, headers)``: the HTTP status code
+    (200, 403, 404 ...) and a dict of lower-cased response headers. Retries
+    network errors, 429 and 5xx; returns the last status (or 0 and no headers
+    for a network failure) instead of raising, so callers can record it."""
     attempt = 0
     while True:
         if limiter:
@@ -121,17 +122,22 @@ def http_status(url, limiter=None, retries=3, timeout=30):
         try:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 STATS.add(network=1)
-                return resp.status
+                return resp.status, {k.lower(): v for k, v in resp.headers.items()}
         except urllib.error.HTTPError as e:
             STATS.add(network=1)
             if not (e.code == 429 or e.code >= 500) or attempt >= retries:
-                return e.code
+                return e.code, {k.lower(): v for k, v in (e.headers or {}).items()}
         except (urllib.error.URLError, TimeoutError, ConnectionError, OSError):
             if attempt >= retries:
-                return 0
+                return 0, {}
         attempt += 1
         STATS.add(retries=1)
         time.sleep(2 ** attempt + random.uniform(0, 0.5))
+
+
+def http_status(url, limiter=None, retries=3, timeout=30):
+    """HEAD ``url`` and return only the HTTP status code (see ``http_head``)."""
+    return http_head(url, limiter, retries, timeout)[0]
 
 
 def _atomic_write(path, body):

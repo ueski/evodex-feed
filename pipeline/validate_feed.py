@@ -15,13 +15,17 @@ It re-reads exactly the bytes that will be uploaded and checks:
 * history/: exactly manifest.history.sets files, setId = file name, ascending dates
   within retention, every series as long as its dates, at least one file ends today;
 * index.json fallback images (``im``): pokemontcg.io / Scrydex hosts only, never
-  tcgplayer-cdn.tcgplayer.com (TCGplayer is a price source only);
+  tcgplayer-cdn.tcgplayer.com (TCGplayer is a price source only); a custom TCGdex
+  image base (``"i": "<url>"``, a TCGdex twin's scan) only on assets.tcgdex.net;
+* cards are only ever added: every card of the previous feed's index.json and of
+  catalog-floor.json is still there, unless overrides.json "removedCards" lists it
+  (--allow-shrink does not change this);
 * sizes: no file over 100 MB, the site under GitHub Pages' 1 GB;
 * against the previous feed (the guards that keep a bad day off the air): build not
   older, products >= 90 % (the app rejects anything less), cards >= 95 %, prices.json
   bytes >= 80 %, and history not lost (days, daily dates and history files carried over);
 * first run (no previous feed): floors on cards and products, so a partial catalog
-  can never be the feed's first day.
+  can never be the feed's first day; its only older days are history seeds.
 
 Python 3.9+, standard library only.
 """
@@ -74,8 +78,11 @@ def _json(r, blob, name):
         return None
 
 
-def validate(site, previous_manifest=None, allow_shrink=False, min_cards=15000, min_products=15000):
-    """Returns (errors, stats). ``previous_manifest`` None = first run (bootstrap)."""
+def validate(site, previous_manifest=None, allow_shrink=False, min_cards=15000, min_products=15000,
+             required_cards=(), seed_dates=()):
+    """Returns (errors, stats). ``previous_manifest`` None = first run (bootstrap).
+    ``required_cards``: card ids index.json must contain (publish_feed.required_cards);
+    ``seed_dates``: dates of the history seeds (the only days a first run may have besides its own)."""
     r = Report()
     stats = {"sizes": {}}
     mpath = os.path.join(site, "manifest.json")
@@ -127,6 +134,15 @@ def validate(site, previous_manifest=None, allow_shrink=False, min_cards=15000, 
         r.expect(not off_list, "index.json: %d im URLs off the allow-list %s, e.g. %s"
                  % (len(off_list), list(images.ALLOWED_HOSTS), off_list[:1]))
         stats["imageHosts"] = hosts
+        custom = [c["i"] for c in index.get("cards") or [] if isinstance(c.get("i"), str)]
+        off_tcgdex = [u for u in custom if not images.allowed_tcgdex(u)]
+        r.expect(not off_tcgdex, "index.json: %d custom image bases (i) off %s, e.g. %s"
+                 % (len(off_tcgdex), images.TCGDEX_IMAGE_HOST, off_tcgdex[:1]))
+        stats["customImages"] = len(custom)
+        problem = publish_feed.missing_cards_problem(required_cards, index)
+        if problem:
+            r.fail(problem)
+        stats["requiredCards"] = len(set(required_cards))
     if isinstance(prices, dict):
         products, rows = publish_feed.price_counts(prices)
         r.expect(prices.get("tcgcsvBuild") == build, "prices.json build %r != manifest %r"
@@ -231,7 +247,9 @@ def validate(site, previous_manifest=None, allow_shrink=False, min_cards=15000, 
     if previous_manifest is None:
         r.expect(cards >= min_cards, "first run: only %d cards (floor %d)" % (cards, min_cards))
         r.expect(products >= min_products, "first run: only %d products (floor %d)" % (products, min_products))
-        r.expect(len(dates) == 1 and max_days == 1, "first run: expected exactly one day of history and daily data")
+        older = [d for d in dates if d != date]
+        r.expect(set(older) <= set(seed_dates) and max_days <= 1 + len(older),
+                 "first run: expected one day of history and daily data (plus history seeds), got %s" % dates)
     else:
         prev_build = previous_manifest.get("tcgcsvBuild")
         if prev_build and build:
@@ -260,7 +278,8 @@ def validate(site, previous_manifest=None, allow_shrink=False, min_cards=15000, 
 def print_stats(stats):
     print("validated: %d cards, %d products, %d price rows, history up to %d day(s)"
           % (stats.get("cards", 0), stats.get("products", 0), stats.get("rows", 0), stats.get("historyDays", 0)))
-    print("  fallback images (im) by host: %s" % (stats.get("imageHosts") or "none"))
+    print("  fallback images (im) by host: %s; TCGdex twin images (i): %d; cards that must stay: %d"
+          % (stats.get("imageHosts") or "none", stats.get("customImages", 0), stats.get("requiredCards", 0)))
     for name in sorted(stats["sizes"]):
         s = stats["sizes"][name]
         print("  %-20s %4d file(s)  raw %10s  gzip %10s"
@@ -280,13 +299,18 @@ def main(argv=None):
     ap.add_argument("--allow-shrink", action="store_true")
     ap.add_argument("--min-cards", type=int, default=15000, help="first-run floor (default 15000)")
     ap.add_argument("--min-products", type=int, default=15000, help="first-run floor (default 15000)")
+    ap.add_argument("--seed-dir", default=publish_feed.SEED_DIR, help="history seeds (as publish_feed.py build)")
     args = ap.parse_args(argv)
     try:
-        previous = publish_feed.previous_state(args).manifest
+        state = publish_feed.previous_state(args)
+        previous = state.manifest
+        required = publish_feed.required_cards(state.index(), publish_feed.load_floor(), publish_feed.load_removed())
+        seed_dates = [d for d, _ in publish_feed.load_seeds(args.seed_dir)]
     except (publish_feed.PublishError, net.FetchError, ValueError) as e:
-        sys.stderr.write("[validate_feed] error: cannot read the previous feed: %s\n" % e)
+        sys.stderr.write("[validate_feed] error: cannot read the previous feed or the history seeds: %s\n" % e)
         return 1
-    errors, stats = validate(args.site, previous, args.allow_shrink, args.min_cards, args.min_products)
+    errors, stats = validate(args.site, previous, args.allow_shrink, args.min_cards, args.min_products,
+                             required, seed_dates)
     print_stats(stats)
     if errors:
         for e in errors:

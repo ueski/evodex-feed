@@ -89,6 +89,46 @@ class AppendColumnTests(unittest.TestCase):
         self.assertEqual(list(h["s"]), ["20.0", "20.1", "100.0"])
 
 
+class InsertColumnTests(unittest.TestCase):
+    """history.insert_column: a past day (history seed) folded into an existing file."""
+    H = {"v": 1, "setId": "s", "dates": ["2026-10-28", "2026-10-29"], "subTypes": ["Holofoil"],
+         "s": {"10.0": [500, 510]}}
+
+    def test_inserts_before_and_keeps_the_gap(self):
+        h, status = history.insert_column(self.H, "2026-10-21", {(10, "Holofoil"): 450, (11, "Normal"): 7,
+                                                               (12, "Normal"): None})
+        self.assertEqual(status, "inserted")
+        self.assertEqual(h["dates"], ["2026-10-21", "2026-10-28", "2026-10-29"])   # no 22nd ... 27th
+        self.assertEqual(h["subTypes"], ["Holofoil", "Normal"])
+        self.assertEqual(h["s"], {"10.0": [450, 500, 510], "11.1": [7, None, None]})
+
+    def test_inserts_between_two_dates(self):
+        h, status = history.insert_column(self.H, "2026-10-28", {(10, "Holofoil"): 1})
+        self.assertEqual(status, "present")
+        self.assertIs(h, self.H)
+        hist = dict(self.H, dates=["2026-10-20", "2026-10-29"])
+        h, status = history.insert_column(hist, "2026-10-21", {(10, "Holofoil"): 450})
+        self.assertEqual(h["dates"], ["2026-10-20", "2026-10-21", "2026-10-29"])
+        self.assertEqual(h["s"]["10.0"], [500, 450, 510])
+
+    def test_real_data_wins_and_empty_or_newer_days_change_nothing(self):
+        self.assertEqual(history.insert_column(self.H, "2026-10-29", {(10, "Holofoil"): 1})[1], "present")
+        self.assertEqual(history.insert_column(self.H, "2026-10-21", {(10, "Holofoil"): None})[1], "empty")
+        self.assertEqual(history.insert_column(self.H, "2026-10-21", {})[1], "empty")
+        self.assertEqual(history.insert_column(self.H, "2026-10-30", {(10, "Holofoil"): 1})[1], "skipped")
+
+    def test_retention(self):
+        self.assertEqual(history.insert_column(self.H, "2026-10-21", {(10, "Holofoil"): 1}, 2)[1], "skipped")
+        h, status = history.insert_column(dict(self.H, dates=["2026-10-20", "2026-10-29"]), "2026-10-21",
+                                          {(10, "Holofoil"): 1}, 2)
+        self.assertEqual((status, h["dates"], h["s"]["10.0"]), ("inserted", ["2026-10-21", "2026-10-29"], [1, 510]))
+
+    def test_input_is_not_mutated(self):
+        before = json.dumps(self.H, sort_keys=True)
+        history.insert_column(self.H, "2026-10-21", {(10, "Holofoil"): 450, (11, "Normal"): 7})
+        self.assertEqual(json.dumps(self.H, sort_keys=True), before)
+
+
 class SnapshotValuesTests(unittest.TestCase):
     def test_values_by_set_remap_subtypes_by_name(self):
         index = {"subTypes": ["Normal", "Holofoil"],
@@ -245,7 +285,12 @@ class BuildFeedTests(unittest.TestCase):
                             {"42382": [[1, 1, 1, 1, 1, 1]]})
         with self.assertRaises(publish_feed.PublishError):
             publish_feed.build_feed(small, self.path("out"), publish_feed.DirPrevious(feed1))
-        publish_feed.build_feed(small, self.path("out"), publish_feed.DirPrevious(feed1), allow_shrink=True)
+        # --allow-shrink accepts the smaller numbers, never a card that disappears without "removedCards"
+        with self.assertRaises(publish_feed.PublishError) as ctx:
+            publish_feed.build_feed(small, self.path("out"), publish_feed.DirPrevious(feed1), allow_shrink=True)
+        self.assertIn("removedCards", str(ctx.exception))
+        publish_feed.build_feed(small, self.path("out"), publish_feed.DirPrevious(feed1), allow_shrink=True,
+                                removed={"base1-5": "test", "sv03.5-025": "test", "empty-1": "test"})
 
     def test_rejects_bundle_whose_files_do_not_match_manifest(self):
         b = self.day1()
@@ -297,6 +342,176 @@ class BuildFeedTests(unittest.TestCase):
         self.assertEqual(summary["sizes"]["prices.json"]["raw"], len(blob))
         self.assertEqual(summary["sizes"]["prices.json"]["gzip"], len(gzip.compress(blob, 6)))
         self.assertEqual(summary["sizes"]["history"]["files"], 2)
+
+
+class CatalogOnlyGrowsTests(unittest.TestCase):
+    """Cards are only ever added (v0.3.1): the 2026-10-28 feed lost 34 cards the app bundle has."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp)
+
+    def path(self, *parts):
+        return os.path.join(self.tmp, *parts)
+
+    PRICES = {"42382": [[1, 95465, 1, 2, 3, 4]], "42383": [[0, 100, 1, 2, 3, 4]], "500": [[0, 25, None, None, None, None]]}
+
+    def feed(self, name, build, cards, previous=None, **kw):
+        out = self.path(name)
+        publish_feed.build_feed(make_bundle(self.path("b-" + name), build, cards, self.PRICES), out,
+                                previous or publish_feed.NoPrevious(), **kw)
+        return out
+
+    def test_previous_index_is_part_of_the_state(self):
+        f1 = self.feed("f1", "2026-10-21T20:05:22+0000", CARDS)
+        self.assertEqual(publish_feed.card_ids(publish_feed.DirPrevious(f1).index()),
+                         {"base1-4", "base1-5", "sv03.5-025", "empty-1"})
+        self.assertIsNone(publish_feed.NoPrevious().index())
+
+    def test_a_card_of_the_previous_feed_may_not_disappear(self):
+        f1 = self.feed("f1", "2026-10-21T20:05:22+0000", CARDS)
+        with self.assertRaises(publish_feed.PublishError) as ctx:      # 3 of 4 cards: below 95 % as well
+            self.feed("f2", "2026-10-22T20:05:22+0000", CARDS[:3], publish_feed.DirPrevious(f1), allow_shrink=True)
+        self.assertIn("empty-1", str(ctx.exception))
+        self.assertFalse(os.path.exists(self.path("f2")))
+        self.feed("f2", "2026-10-22T20:05:22+0000", CARDS[:3], publish_feed.DirPrevious(f1), allow_shrink=True,
+                  removed={"empty-1": "TCGdex merged it into base1-5"})
+        # new cards are always fine
+        self.feed("f3", "2026-10-22T20:05:22+0000", CARDS + [{"s": "new", "l": "1", "n": "New"}],
+                  publish_feed.DirPrevious(f1))
+
+    def test_a_small_loss_passes_the_95_percent_guard_but_not_this_one(self):
+        # 2026-10-28: 34 of 21,290 cards (0.16 %) went missing and the shrink guard let it through
+        cards = CARDS + [{"s": "mep", "l": "%03d" % i, "n": "Promo %d" % i} for i in range(1, 41)]
+        f1 = self.feed("f1", "2026-10-21T20:05:22+0000", cards)
+        with self.assertRaises(publish_feed.PublishError) as ctx:
+            self.feed("f2", "2026-10-22T20:05:22+0000", cards[:-1], publish_feed.DirPrevious(f1))
+        self.assertIn("1 card(s)", str(ctx.exception))
+        self.assertIn("mep-040", str(ctx.exception))
+
+    def test_floor_applies_without_a_previous_index(self):
+        # the first run after this change: the data branch has no index.json yet, the floor (app bundle) does
+        floor = {"base1-4", "mep-089", "30th-B"}
+        with self.assertRaises(publish_feed.PublishError) as ctx:
+            self.feed("f1", "2026-10-21T20:05:22+0000", CARDS, floor=floor)
+        self.assertIn("2 card(s)", str(ctx.exception))
+        self.assertIn("mep-089", str(ctx.exception))
+        self.feed("f1", "2026-10-21T20:05:22+0000", CARDS + [{"s": "mep", "l": "089", "n": "A"},
+                                                             {"s": "30th", "l": "B", "n": "Mew"}], floor=floor)
+
+    def test_required_cards(self):
+        prev = {"cards": [{"s": "a", "l": "1"}, {"s": "a", "l": "2"}]}
+        self.assertEqual(publish_feed.required_cards(prev, {"b-1"}, {"a-2": "why"}), {"a-1", "b-1"})
+        self.assertEqual(publish_feed.required_cards(None), set())
+
+    def test_floor_file_only_grows_and_loads(self):
+        floor = self.path("catalog-floor.json")
+        i1, i2 = self.path("i1.json"), self.path("i2.json")
+        with open(i1, "w") as f:
+            json.dump({"cards": [{"s": "mep", "l": "010"}, {"s": "mep", "l": "2"}, {"s": "mep", "l": "Museum"}]}, f)
+        with open(i2, "w") as f:
+            json.dump({"cards": [{"s": "mep", "l": "1"}]}, f)
+        self.assertEqual(publish_feed.add_to_floor([i1], "app 0.3.0", floor), (0, 3))
+        self.assertEqual(publish_feed.add_to_floor([i2], None, floor), (3, 4))
+        self.assertEqual(publish_feed.add_to_floor([i1], "again", floor), (4, 4))
+        doc = read(floor)
+        self.assertEqual(doc["sets"]["mep"], ["1", "2", "010", "Museum"])
+        self.assertEqual(doc["cards"], 4)
+        self.assertEqual(len(doc["sources"]), 2)              # "again" added nothing
+        self.assertEqual(publish_feed.load_floor(floor), {"mep-1", "mep-2", "mep-010", "mep-Museum"})
+        self.assertEqual(publish_feed.load_floor(self.path("missing.json")), set())
+
+    def test_repository_floor_and_allowlist(self):
+        """catalog-floor.json holds at least the 0.3.0 bundle (21,290 cards, incl. the 34 the feed lost)."""
+        floor = publish_feed.load_floor()
+        self.assertGreaterEqual(len(floor), 21290)
+        for cid in ("mep-089", "mep-110", "mep-120", "mee-009", "mee-016", "30th-B", "30th-G", "30th-R"):
+            self.assertIn(cid, floor)
+        self.assertEqual(publish_feed.load_removed(), {})
+
+
+class HistorySeedTests(unittest.TestCase):
+    """A one-time seed (our own 2026-10-21 snapshot) folded into a feed whose history starts on 2026-10-28."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp)
+
+    def path(self, *parts):
+        return os.path.join(self.tmp, *parts)
+
+    def bundle(self, name, build, prices):
+        return make_bundle(self.path(name), build, CARDS, prices)
+
+    def seed(self):
+        b = self.bundle("seed-bundle", "2026-10-21T20:05:22+0000",
+                        {"42382": [[1, 90000, 1, 2, 3, 4]], "500": [[0, 20, None, None, None, None]]})
+        return [("2026-10-21", read(os.path.join(b, "prices-market.json"), binary=True))]
+
+    def two_live_days(self):
+        f28 = self.path("f28")
+        publish_feed.build_feed(self.bundle("b28", "2026-10-28T20:06:05+0000",
+                                            {"42382": [[1, 95000, 1, 2, 3, 4]], "42383": [[0, 100, 1, 2, 3, 4]],
+                                             "500": [[0, 25, None, None, None, None]]}),
+                                f28, publish_feed.NoPrevious())
+        return f28
+
+    def test_seed_is_merged_once_and_manifest_stays_consistent(self):
+        f28 = self.two_live_days()
+        b29 = self.bundle("b29", "2026-10-29T20:05:00+0000",
+                          {"42382": [[1, 96000, 1, 2, 3, 4]], "42383": [[0, 101, 1, 2, 3, 4]],
+                           "500": [[0, 26, None, None, None, None]]})
+        f29 = self.path("f29")
+        summary = publish_feed.build_feed(b29, f29, publish_feed.DirPrevious(f28), seeds=self.seed())
+        self.assertEqual(summary["historyStatus"], {"appended": 2, "seed 2026-10-21 inserted": 2})
+        h = read(os.path.join(f29, "history", "base1.json"))
+        self.assertEqual(h["dates"], ["2026-10-21", "2026-10-28", "2026-10-29"])   # the gap stays a gap
+        self.assertEqual(h["s"]["42382.1"], [90000, 95000, 96000])
+        self.assertEqual(h["s"]["42383.0"], [None, 100, 101])
+        m = read(os.path.join(f29, "manifest.json"))
+        self.assertEqual(m["history"]["from"], "2026-10-21")
+        self.assertEqual(m["history"]["to"], "2026-10-29")
+        self.assertEqual(m["history"]["days"], 3)
+        self.assertEqual(m["daily"]["dates"], ["2026-10-21", "2026-10-28", "2026-10-29"])
+        self.assertEqual(read(os.path.join(f29, "daily", "2026-10-21.json"), binary=True), self.seed()[0][1])
+        # next night: the date is in the state, the seed changes nothing
+        b30 = self.bundle("b30", "2026-10-30T20:05:00+0000", {"42382": [[1, 97000, 1, 2, 3, 4]]})
+        f30 = self.path("f30")
+        summary = publish_feed.build_feed(b30, f30, publish_feed.DirPrevious(f29), seeds=self.seed(),
+                                          allow_shrink=True)
+        self.assertEqual(summary["historyStatus"], {"appended": 2, "seed 2026-10-21 present": 2})
+        self.assertEqual(read(os.path.join(f30, "history", "base1.json"))["s"]["42382.1"],
+                         [90000, 95000, 96000, 97000])
+        self.assertEqual(read(os.path.join(f30, "manifest.json"))["daily"]["dates"],
+                         ["2026-10-21", "2026-10-28", "2026-10-29", "2026-10-30"])
+
+    def test_seed_of_today_or_later_is_ignored(self):
+        f = self.path("f")
+        b21 = self.bundle("b21", "2026-10-21T20:05:22+0000", {"42382": [[1, 1, 1, 1, 1, 1]]})
+        summary = publish_feed.build_feed(b21, f, publish_feed.NoPrevious(), seeds=self.seed())
+        self.assertEqual(summary["historyStatus"], {"appended": 2})
+        self.assertEqual(read(os.path.join(f, "history", "base1.json"))["s"]["42382.1"], [1])
+
+    def test_seed_outside_daily_retention_is_not_added(self):
+        f28 = self.two_live_days()
+        b29 = self.bundle("b29", "2026-10-29T20:05:00+0000", {"42382": [[1, 96000, 1, 2, 3, 4]]})
+        f29 = self.path("f29")
+        publish_feed.build_feed(b29, f29, publish_feed.DirPrevious(f28), seeds=self.seed(), daily_retention=2,
+                                allow_shrink=True)
+        self.assertEqual(read(os.path.join(f29, "manifest.json"))["daily"]["dates"], ["2026-10-28", "2026-10-29"])
+
+    def test_load_seeds(self):
+        d = self.path("history-seed")
+        os.makedirs(d)
+        blob = self.seed()[0][1]
+        with open(os.path.join(d, "2026-10-21.json"), "wb") as f:
+            f.write(blob)
+        self.assertEqual(publish_feed.load_seeds(d), [("2026-10-21", blob)])
+        self.assertEqual(publish_feed.load_seeds(self.path("none")), [])
+        with open(os.path.join(d, "2026-10-20.json"), "wb") as f:
+            f.write(blob)                                   # build of the 21st named the 20th
+        with self.assertRaises(publish_feed.PublishError):
+            publish_feed.load_seeds(d)
 
 
 class CheckTests(unittest.TestCase):

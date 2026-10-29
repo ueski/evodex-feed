@@ -141,6 +141,44 @@ class ValidateFeedTests(unittest.TestCase):
         self.rewrite_index(f1, add(["https://example.com/a.png", "https://images.pokemontcg.io/a/1_hires.png"]))
         self.assertTrue(any("allow-list" in e for e in self.validate(f1)))
 
+    def test_custom_tcgdex_image_base_must_stay_on_tcgdex(self):
+        f1 = self.feed("f1", "2026-10-21T20:05:22+0000", DAY1)
+
+        def set_i(url):
+            def mutate(index):
+                index["cards"][0]["i"] = url
+            return mutate
+
+        self.rewrite_index(f1, set_i("https://assets.tcgdex.net/en/xy/xy4/24a"))
+        errors, stats = validate_feed.validate(f1, None, min_cards=1, min_products=1)
+        self.assertEqual(errors, [])
+        self.assertEqual(stats["customImages"], 1)
+        self.rewrite_index(f1, set_i("https://tcgplayer-cdn.tcgplayer.com/product/42382_in_1000x1000.jpg"))
+        self.assertTrue(any("custom image bases" in e for e in self.validate(f1)))
+
+    def test_cards_are_only_ever_added(self):
+        f1, f2 = self.two_days()
+        required = publish_feed.required_cards(publish_feed.DirPrevious(f1).index(), {"mep-089"})
+        errors = self.validate(f2, self.manifest(f1), required_cards=required)
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("mep-089", errors[0])
+        # --allow-shrink does not let a card go; overrides.json "removedCards" does
+        self.assertEqual(len(self.validate(f2, self.manifest(f1), required_cards=required, allow_shrink=True)), 1)
+        required = publish_feed.required_cards(publish_feed.DirPrevious(f1).index(), {"mep-089"},
+                                               {"mep-089": "test"})
+        self.assertEqual(self.validate(f2, self.manifest(f1), required_cards=required), [])
+
+    def test_first_run_may_carry_history_seeds_only(self):
+        seed_bundle = make_bundle(self.path("seed"), "2026-10-20T20:05:22+0000", CARDS, DAY1)
+        with open(os.path.join(seed_bundle, "prices-market.json"), "rb") as f:
+            seeds = [("2026-10-20", f.read())]
+        b = make_bundle(self.path("b1"), "2026-10-21T20:05:22+0000", CARDS, DAY1)
+        f1 = self.path("f1")
+        publish_feed.build_feed(b, f1, publish_feed.NoPrevious(), seeds=seeds)
+        self.assertEqual(self.manifest(f1)["daily"]["dates"], ["2026-10-20", "2026-10-21"])
+        self.assertEqual(self.validate(f1, seed_dates=["2026-10-20"]), [])
+        self.assertTrue(any("first run" in e for e in self.validate(f1)))
+
     def test_older_build_than_previous_fails(self):
         f1, f2 = self.two_days()
         errors = self.validate(f1, self.manifest(f2), allow_shrink=True)

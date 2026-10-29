@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# The feed's state between daily runs (manifest.json, history/, daily/) lives on the
-# `data` branch of this repository. GitHub Pages only serves a copy of it.
+# The feed's state between daily runs (manifest.json, index.json, history/, daily/) lives on
+# the `data` branch of this repository. GitHub Pages only serves a copy of it. index.json is
+# there so the next run can check that no published card disappears (validate_feed.py).
 #
 #   scripts/state.sh pull <dir> [<feed-url>]
 #       Empties <dir>, fills it with the data branch's files and prints where the previous
@@ -13,7 +14,7 @@
 #         anything else                         exit 1: never guess, a wrong guess wipes history
 #
 #   scripts/state.sh push <site-dir> <message>
-#       Commits <site-dir>/{manifest.json,history,daily} as the next commit of the data
+#       Commits <site-dir>/{manifest.json,index.json,history,daily} as the next commit of the data
 #       branch and pushes it (fast-forward only). Uses a temporary index, so the checkout
 #       of main is never touched.
 #
@@ -69,9 +70,10 @@ pull() {
 push() {
     local site="$1" message="$2" tmp tree parent="" commit
     [ -f "$site/manifest.json" ] || die "$site/manifest.json missing"
+    [ -f "$site/index.json" ] || die "$site/index.json missing"
     [ -d "$site/history" ] && [ -d "$site/daily" ] || die "$site has no history/ or daily/"
     tmp="$(mktemp -d)"
-    GIT_INDEX_FILE="$tmp/index" git --work-tree="$site" add --force -- manifest.json history daily
+    GIT_INDEX_FILE="$tmp/index" git --work-tree="$site" add --force -- manifest.json index.json history daily
     tree="$(GIT_INDEX_FILE="$tmp/index" git write-tree)"
     rm -rf "$tmp"
     if git rev-parse --verify --quiet "$REF^{commit}" >/dev/null; then

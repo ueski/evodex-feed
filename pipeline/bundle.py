@@ -29,7 +29,7 @@ index.json (bundled, ~read-only catalog)
     image file URL (images.pokemontcg.io "_hires.png" or images.scrydex.com
     ".../large"), NOT a TCGdex base to append "/low.webp" to. Decoders
     that do not know "im" keep showing the placeholder. See images.py and
-    data-sources.md in the Evodex app repository "Fallback images".
+    docs/architecture/data-sources.md "Fallback images" (Evodex app repository).
     "gid" is present only when the product's TCGplayer group differs from its
     set's first group (sets[].groups[0]); otherwise that first group is
     implied. tcgGroups gives the group name / abbreviation (TCGplayer CSV

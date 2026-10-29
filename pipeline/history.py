@@ -211,3 +211,57 @@ def append_column(hist, date, values, retention_days=365):
     out.update({"v": 1, "dates": dates, "subTypes": subtypes,
                 "s": {k: series[k] for k in sorted(series, key=order)}})
     return out, status
+
+
+def insert_column(hist, date, values, retention_days=365):
+    """Fold a PAST day into a history dict (a one-time seed, see publish_feed.py
+    "history seeds"). Pure: returns (new_hist, status).
+
+    status is "inserted" (the column now sits at its sorted position), "present"
+    (the file already has ``date``: real data always wins, nothing changes),
+    "empty" (``values`` has no price: no column is added, so no date without
+    data appears) or "skipped" (``date`` is newer than the file's last date, which
+    is append_column's job, or the file already keeps ``retention_days`` dates
+    that are all newer). Like append_column: new series are back-filled with null,
+    the subTypes table only grows, all-null series are dropped. Dates are never
+    filled in between: a gap stays a gap.
+    """
+    dates = list(hist.get("dates", []))
+    if date in dates:
+        return hist, "present"
+    if not any(v is not None for v in values.values()):
+        return hist, "empty"
+    if dates and date > dates[-1]:
+        return hist, "skipped"
+    if retention_days and len(dates) >= retention_days and (not dates or date < dates[0]):
+        return hist, "skipped"
+    subtypes = list(hist.get("subTypes", []))
+    st_idx = {name: i for i, name in enumerate(subtypes)}
+    col = sum(1 for d in dates if d < date)
+    dates.insert(col, date)
+    series = {k: v[:col] + [None] + v[col:] for k, v in hist.get("s", {}).items()}
+    for (pid, name), cents in values.items():
+        if cents is None:
+            continue
+        if name not in st_idx:
+            st_idx[name] = len(subtypes)
+            subtypes.append(name)
+        key = "%d.%d" % (pid, st_idx[name])
+        arr = series.get(key)
+        if arr is None:
+            arr = series[key] = [None] * len(dates)
+        arr[col] = cents
+    if retention_days and len(dates) > retention_days:
+        cut = len(dates) - retention_days
+        dates = dates[cut:]
+        series = {k: v[cut:] for k, v in series.items()}
+    series = {k: v for k, v in series.items() if any(x is not None for x in v)}
+
+    def order(key):
+        pid, st = key.split(".")
+        return int(pid), int(st)
+
+    out = dict(hist)
+    out.update({"v": 1, "dates": dates, "subTypes": subtypes,
+                "s": {k: series[k] for k in sorted(series, key=order)}})
+    return out, "inserted"

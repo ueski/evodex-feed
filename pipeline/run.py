@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-"""Regenerate every Evodex data output into pipeline/out/.
+"""Regenerate every Evodex data output into out/ next to this file.
 
-    python3 pipeline/run.py              # normal run (uses + refreshes cache)
-    python3 pipeline/run.py --offline    # cache only, no network
-    python3 pipeline/run.py --sets sv03.5,base1   # quick partial run
-    python3 pipeline/run.py --offline --online-aux
+The pipeline lives in two repositories with identical files: the Evodex app
+(tools/pipeline/, the source of truth) and ueski/evodex-feed (pipeline/).
+
+    python3 tools/pipeline/run.py              # normal run (uses + refreshes cache)
+    python3 tools/pipeline/run.py --offline    # cache only, no network
+    python3 tools/pipeline/run.py --sets sv03.5,base1   # quick partial run
+    python3 tools/pipeline/run.py --offline --online-aux
         # catalog + prices from the cache; auxiliary sources (pokemontcg.io,
         # image HEAD checks, PokéAPI) refreshed. --online-images is an alias.
 
@@ -139,7 +142,12 @@ def load_image_status(path):
 
 def check_image_urls(urls, status_cache, offline, workers=4):
     """HEAD every URL whose cached status is missing or stale (200: 90 days,
-    anything else: 7 days). Offline: cache only. Returns the number checked."""
+    anything else: 7 days). Offline: cache only. Returns the number checked.
+
+    A host with a placeholder probe (images.PLACEHOLDER_PROBES: Scrydex answers
+    200 with a card back for unknown ids) is probed once first; a 200 with the
+    probe's ETag is recorded as 404 ("placeholder"). If the probe itself fails,
+    that host's URLs are not checked this run (their cached status stays)."""
     now = time.time()
 
     def fresh(u):
@@ -152,21 +160,48 @@ def check_image_urls(urls, status_cache, offline, workers=4):
     if offline or not todo:
         return 0
     # <= 10 HEAD/s per host; built up front so the worker threads only read it
-    limiters = {host: net.RateLimiter(0.1) for host in {urllib.parse.urlparse(u).netloc for u in todo}}
+    hosts = {urllib.parse.urlparse(u).netloc for u in todo}
+    limiters = {host: net.RateLimiter(0.1) for host in hosts}
+    signatures = {}
+    for host in sorted(hosts & set(images.PLACEHOLDER_PROBES)):
+        code, headers = net.http_head(images.PLACEHOLDER_PROBES[host], limiter=limiters[host])
+        signatures[host] = images.placeholder_signature(headers) if code == 200 else None
+        if signatures[host] is None:
+            log("  ! %s placeholder probe failed (HTTP %s); its URLs are not checked this run" % (host, code))
+            todo = [u for u in todo if urllib.parse.urlparse(u).netloc != host]
+
+    def head(u):
+        host = urllib.parse.urlparse(u).netloc
+        code, headers = net.http_head(u, limiter=limiters[host])
+        if code == 200 and images.is_placeholder(headers, signatures.get(host)):
+            return [404, int(now), "placeholder"]
+        return [code, int(now)]
+
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        codes = pool.map(lambda u: net.http_status(u, limiter=limiters[urllib.parse.urlparse(u).netloc]),
-                         todo)
-        for i, (u, code) in enumerate(zip(todo, codes), 1):
-            status_cache[u] = [code, int(now)]
+        for i, (u, entry) in enumerate(zip(todo, pool.map(head, todo)), 1):
+            status_cache[u] = entry
             if i % 250 == 0 or i == len(todo):
                 log("  image HEAD %d/%d" % (i, len(todo)))
     return len(todo)
 
 
 def add_image_fallbacks(args, overrides, physical, cards_out):
-    """Sets c["imageFallback"] = {"source", "url"} on cards without a TCGdex
-    image (images.py: pokemontcg.io / Scrydex only) and returns the report block for summary.json."""
+    """For cards without a TCGdex image (images.py): a TCGdex twin's image
+    (c["image"], c["imageTwin"]), else c["imageFallback"] = {"source", "url"}
+    from pokemontcg.io / Scrydex. Returns the report block for summary.json."""
     need = [c for c in cards_out if not c.get("image")]
+    twins = images.twin_images([
+        {"id": c["id"], "localId": c["localId"], "name": c["name"], "image": c.get("image"),
+         "products": [v["productId"] for v in (c.get("tcgplayer") or {}).get("variants", [])]}
+        for c in cards_out])
+    twin_of = {}
+    for c in need:
+        img, twin = twins.get(c["id"], (None, None))
+        if img and images.allowed_tcgdex(img):
+            c["image"] = img
+            c["imageTwin"] = twin_of[c["id"]] = twin
+    still = [c for c in need if not c.get("image")]
+
     # --offline --online-aux: catalog and prices from the cache, image sources live
     offline = args.offline and not args.online_aux
     ptcg = sources.PokemonTCGio(args.cache, offline=offline)
@@ -181,7 +216,7 @@ def add_image_fallbacks(args, overrides, physical, cards_out):
         {k: v for k, v in overrides.get("ptcgioSets", {}).items() if not k.startswith("_")})
 
     by_set = defaultdict(list)
-    for c in need:
+    for c in still:
         by_set[c["setId"]].append(c)
     ptcg_hit = {}
     for sid in sorted(by_set):
@@ -195,10 +230,10 @@ def add_image_fallbacks(args, overrides, physical, cards_out):
             continue
         briefs = [{"id": c["id"], "localId": c["localId"], "name": c["name"],
                    "printedNumber": (c.get("tcgplayer") or {}).get("number")} for c in by_set[sid]]
-        for cid, p in images.match_cards(briefs, pcards).items():
-            ptcg_hit[cid] = images.large_image(p)
+        ptcg_hit.update(images.match_cards(briefs, pcards))
 
-    candidates = {c["id"]: [("ptcgio", ptcg_hit.get(c["id"]))] for c in need}
+    candidates = {c["id"]: images.candidates(ptcg_hit[c["id"]]) if c["id"] in ptcg_hit else []
+                  for c in still}
 
     status_path = os.path.join(args.cache, "images", "status.json")
     status_cache = load_image_status(status_path)
@@ -221,12 +256,14 @@ def add_image_fallbacks(args, overrides, physical, cards_out):
 
     counts = defaultdict(int)
     failed = defaultdict(int)       # candidates rejected by the HEAD check, per source
+    placeholders = 0                # ... of which Scrydex card-back placeholders
     unchecked = defaultdict(int)    # chosen without a recorded status (offline, never checked)
     uncovered = defaultdict(list)
-    for c in need:
+    for c in still:
         for source, url in candidates[c["id"]]:
             if url and status(url) not in (None, 200):
                 failed[source] += 1
+                placeholders += len(status_cache[url]) > 2 and status_cache[url][2] == "placeholder"
         source, url = images.choose(candidates[c["id"]], status)
         if url:
             assert images.allowed(url), url
@@ -237,20 +274,27 @@ def add_image_fallbacks(args, overrides, physical, cards_out):
         else:
             counts["none"] += 1
             uncovered[c["setId"]].append(c["localId"])
+    need_by_set = defaultdict(list)
+    for c in need:
+        need_by_set[c["setId"]].append(c)
     total = len(cards_out)
     return {
         "cards": total, "tcgdex": total - len(need), "withoutTcgdex": len(need),
+        "tcgdexTwin": len(twin_of), "twins": dict(sorted(twin_of.items())),
         "fallback": {s: counts[s] for s in images.SOURCES}, "none": counts["none"],
         "coveredPct": pct(total - counts["none"], total),
-        "headChecked": checked, "rejectedByHead": dict(failed), "chosenUnchecked": dict(unchecked),
+        "headChecked": checked, "rejectedByHead": dict(failed), "placeholders": placeholders,
+        "chosenUnchecked": dict(unchecked),
         "ptcgioSources": dict(sorted(ptcg.sources.items())),
         "setMap": {sid: {"ptcgioSet": set_map.get(sid, (None, "none"))[0],
                          "method": set_map.get(sid, (None, "none"))[1],
-                         "cards": len(by_set[sid]),
-                         "ptcgio": sum(1 for c in by_set[sid]
-                                       if (c.get("imageFallback") or {}).get("source") == "ptcgio"),
+                         "cards": len(cs),
+                         "twin": sum(1 for c in cs if c.get("imageTwin")),
+                         "ptcgio": sum(1 for c in cs if (c.get("imageFallback") or {}).get("source") == "ptcgio"),
+                         "scrydex": sum(1 for c in cs
+                                        if (c.get("imageFallback") or {}).get("source") == "scrydex"),
                          "none": len(uncovered.get(sid, []))}
-                   for sid in sorted(by_set)},
+                   for sid, cs in sorted(need_by_set.items())},
         "uncovered": {sid: ids for sid, ids in sorted(uncovered.items())},
     }
 
@@ -490,8 +534,9 @@ def build(args):
     # ---- fallback images for cards TCGdex has no scan for (images.py)
     log("Fallback images ...")
     image_report = add_image_fallbacks(args, overrides, physical, cards_out)
-    log("  %d without TCGdex image: %s, none %d  (%s)" % (
-        image_report["withoutTcgdex"], image_report["fallback"], image_report["none"], net.STATS))
+    log("  %d without TCGdex image: TCGdex twin %d, %s, none %d  (%s)" % (
+        image_report["withoutTcgdex"], image_report["tcgdexTwin"], image_report["fallback"],
+        image_report["none"], net.STATS))
 
     # ---- species: dx on Pokémon cards + species.json (species.py)
     log("Species ...")
@@ -636,7 +681,7 @@ def build(args):
     with open(os.path.join(out, "REPORT.md"), "w", encoding="utf-8") as f:
         f.write(render_report(summary, cov, map_report, set_meta))
     log("done in %.0fs -> %s" % (time.time() - t0, out))
-    print_summary(summary, cov)
+    print_summary(summary, cov, out)
     return summary
 
 
@@ -809,16 +854,18 @@ def render_report(summary, cov, map_report, set_meta):
           tp["cardmarketAvg30"], pct(tp["cardmarketAvg30"], tp["cards"])))
     im = summary["images"]
     a("## Images\n")
-    a("TCGdex image: %d of %d cards. Without one: %d; fallback from pokemontcg.io %d, "
-      "none %d. Cards with some image: %.1f%%. HEAD checks this run: %d; candidates rejected by the "
-      "check: %s; chosen without a recorded check: %s.\n" % (
-          im["tcgdex"], im["cards"], im["withoutTcgdex"], im["fallback"]["ptcgio"],
-          im["none"], im["coveredPct"], im["headChecked"],
-          im["rejectedByHead"] or "none", im["chosenUnchecked"] or "none"))
-    a("| Set | No TCGdex image | pokemontcg.io set | pokemontcg.io | none |")
-    a("|---|---:|---|---:|---:|")
+    a("TCGdex image: %d of %d cards. Without one: %d; a TCGdex twin's image %d, fallback from "
+      "pokemontcg.io %d, from Scrydex (same pokemontcg.io id) %d, none %d. Cards with some image: %.1f%%. "
+      "HEAD checks this run: %d; candidates rejected by the check: %s (Scrydex placeholders: %d); chosen "
+      "without a recorded check: %s.\n" % (
+          im["tcgdex"], im["cards"], im["withoutTcgdex"], im["tcgdexTwin"], im["fallback"]["ptcgio"],
+          im["fallback"]["scrydex"], im["none"], im["coveredPct"], im["headChecked"],
+          im["rejectedByHead"] or "none", im["placeholders"], im["chosenUnchecked"] or "none"))
+    a("| Set | No TCGdex image | pokemontcg.io set | TCGdex twin | pokemontcg.io | Scrydex | none |")
+    a("|---|---:|---|---:|---:|---:|---:|")
     for sid, r in im["setMap"].items():
-        a("| %s | %d | %s | %d | %d |" % (sid, r["cards"], r["ptcgioSet"] or "-", r["ptcgio"], r["none"]))
+        a("| %s | %d | %s | %d | %d | %d | %d |" % (sid, r["cards"], r["ptcgioSet"] or "-", r["twin"],
+                                                   r["ptcgio"], r["scrydex"], r["none"]))
     sp = summary["species"]
     a("\n## Species\n")
     a("%d species (PokéAPI; by generation %s). Pokémon cards with dx: %d of %d (%d with several species). "
@@ -843,7 +890,7 @@ def render_report(summary, cov, map_report, set_meta):
     return "\n".join(L) + "\n"
 
 
-def print_summary(summary, cov):
+def print_summary(summary, cov, out):
     o = cov["overall"]
     print("cards %d | productId %.1f%% | market %.1f%% | methods %s" % (
         o["cards"], o["productIdPct"], o["marketPct"], summary["matchMethods"]))
@@ -851,7 +898,7 @@ def print_summary(summary, cov):
         print("  %-45s %6d  pid %5.1f%%  mkt %5.1f%%" % (e["era"], e["cards"], e["productIdPct"],
                                                          e["marketPct"]))
     print("validation", summary["validation"])
-    print("REPORT: %s" % os.path.join(HERE, "out", "REPORT.md"))
+    print("REPORT: %s" % os.path.join(out, "REPORT.md"))
 
 
 def main(argv=None):

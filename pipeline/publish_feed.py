@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Build the static price feed the Evodex app reads, and decide whether a
-new build is due. Layout: README.md "Feed layout".
+new build is due. Layout: evodex-feed README.md "Feed layout"; client protocol:
+docs/architecture/price-feed.md in the Evodex app repository. Paths below are
+evodex-feed's (pipeline/); the app repository keeps the same file in tools/pipeline/.
 
     # Is there a TCGCSV build newer than the previous feed? (writes
     # changed=true|false to $GITHUB_OUTPUT when set). --wait-minutes polls
@@ -10,7 +12,10 @@ new build is due. Layout: README.md "Feed layout".
     # Fold today's bundle (pipeline/out/bundle, written by run.py) into the
     # previous feed and write a complete deployable directory
     python3 pipeline/publish_feed.py build --bundle pipeline/out/bundle --out site \\
-        [--previous DIR|URL] [--history-retention 365] [--daily-retention 90]
+        [--previous DIR|URL] [--history-retention 365] [--daily-retention 90] [--seed-dir DIR]
+
+    # Add every card of an index.json (e.g. a shipped app bundle) to catalog-floor.json
+    python3 pipeline/publish_feed.py floor --add path/to/index.json --label "app 0.3.0 bundle"
 
 The previous state is a feed directory with the same layout (the `data` branch
 checked out by scripts/state.sh, see README.md "History and state"), or a live
@@ -21,6 +26,17 @@ there is no previous feed (bootstrap). Over HTTPS a 404 for manifest.json means
 "no feed yet"; any other network or HTTP error aborts before anything is
 written, so a flaky fetch can never publish a feed with its history wiped.
 
+Cards are only ever added. Every card of the previous feed's index.json and of
+catalog-floor.json (every catalog an app version ships with) must still be in
+today's index.json, or the build stops; --allow-shrink does not override this.
+A card that must really go is listed in overrides.json "removedCards".
+
+History seeds (history-seed/<YYYY-MM-DD>.json, a prices-market.json of an
+earlier TCGCSV build we downloaded ourselves): each build folds a seed into
+every history file and daily/ that lacks that date (history.insert_column), so a
+day the feed never published still shows on the charts. Once the date is in the
+state it is "present" and the seed is a no-op; dates are never interpolated.
+
 Python 3.9+, standard library only.
 """
 
@@ -30,6 +46,7 @@ import gzip
 import hashlib
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -54,6 +71,9 @@ DAILY_TEMPLATE = "daily/{date}.json"
 MIN_PRODUCTS_RATIO = 0.90
 MIN_CARDS_RATIO = 0.95
 MIN_PRICES_BYTES_RATIO = 0.80
+CATALOG_FLOOR = os.path.join(HERE, "catalog-floor.json")
+OVERRIDES = os.path.join(HERE, "overrides.json")
+SEED_DIR = os.path.join(HERE, "history-seed")
 
 
 class PublishError(Exception):
@@ -91,6 +111,9 @@ class NoPrevious:
     def daily(self, date):
         return None
 
+    def index(self):
+        return None
+
 
 class DirPrevious:
     """A previous feed on disk (same layout as the site)."""
@@ -120,6 +143,12 @@ class DirPrevious:
             return None
         with open(path, "rb") as f:
             return f.read()
+
+    def index(self):
+        """The previous feed's index.json, or None (a state from before the data
+        branch carried it)."""
+        path = os.path.join(self.root, "index.json")
+        return _load_json_file(path) if os.path.isfile(path) else None
 
 
 class UrlPrevious:
@@ -159,6 +188,12 @@ class UrlPrevious:
 
     def daily(self, date):
         return self._get(DAILY_TEMPLATE.format(date=date))
+
+    def index(self):
+        if self.manifest is None:
+            return None
+        body = self._get("index.json")
+        return None if body is None else json.loads(body)
 
 
 def _load_json_file(path):
@@ -227,6 +262,66 @@ def shrink_problems(prev_manifest, cards, products, prices_bytes):
     return problems
 
 
+# ---- cards are only ever added ----------------------------------------------------
+
+def card_ids(index_obj):
+    """Card ids ("<setId>-<localId>") of an index.json object."""
+    return {"%s-%s" % (c["s"], c["l"]) for c in (index_obj or {}).get("cards") or []}
+
+
+def load_floor(path=CATALOG_FLOOR):
+    """Card ids in catalog-floor.json ({"sets": {setId: [localId, ...]}}); empty when absent."""
+    if not os.path.isfile(path):
+        return set()
+    doc = _load_json_file(path)
+    return {"%s-%s" % (sid, lid) for sid, lids in (doc.get("sets") or {}).items() for lid in lids}
+
+
+def load_removed(path=OVERRIDES):
+    """overrides.json "removedCards": {cardId: reason}, the only cards allowed to leave the catalog."""
+    if not os.path.isfile(path):
+        return {}
+    removed = _load_json_file(path).get("removedCards") or {}
+    return {k: v for k, v in removed.items() if not k.startswith("_")}
+
+
+def required_cards(previous_index, floor=(), removed=()):
+    """Every card id today's index.json must still contain: the previous feed's cards and
+    the floor's (load_floor), minus the allowed removals (load_removed)."""
+    return (set(floor) | card_ids(previous_index)) - set(removed)
+
+
+def missing_cards_problem(required, index_obj):
+    """A message naming the required cards today's index lacks, or None."""
+    missing = sorted(set(required) - card_ids(index_obj))
+    if not missing:
+        return None
+    return ("%d card(s) of the previous feed or catalog-floor.json are missing from index.json (%s); cards are "
+            "only ever added: if a removal is intended, list it in overrides.json \"removedCards\""
+            % (len(missing), ", ".join(missing[:25]) + (" ..." if len(missing) > 25 else "")))
+
+
+# ---- history seeds -----------------------------------------------------------------
+
+def load_seeds(seed_dir=SEED_DIR):
+    """[(date, prices-market.json bytes)] from <seed_dir>/<YYYY-MM-DD>.json, oldest first.
+    A seed whose tcgcsvBuild is not from its file name's day is an error."""
+    if not seed_dir or not os.path.isdir(seed_dir):
+        return []
+    out = []
+    for name in sorted(os.listdir(seed_dir)):
+        if not name.endswith(".json"):
+            continue
+        date = name[:-5]
+        with open(os.path.join(seed_dir, name), "rb") as f:
+            blob = f.read()
+        build = (json.loads(blob).get("tcgcsvBuild") or "")[:10]
+        if build != date:
+            raise PublishError("history seed %s holds TCGCSV build %r" % (name, build))
+        out.append((date, blob))
+    return out
+
+
 def check_not_regressing(prev_manifest, today_build, index_obj, prices_obj, prices_blob, allow_shrink):
     if not prev_manifest:
         return
@@ -246,8 +341,12 @@ def check_not_regressing(prev_manifest, today_build, index_obj, prices_obj, pric
 
 
 def build_feed(bundle_dir, out_dir, previous, history_retention=365, daily_retention=90,
-               allow_shrink=False):
-    """Write a complete feed directory. Returns a summary dict."""
+               allow_shrink=False, seeds=(), floor=(), removed=()):
+    """Write a complete feed directory. Returns a summary dict.
+
+    ``seeds``: [(date, prices-market.json bytes)] (load_seeds); ``floor`` / ``removed``:
+    catalog-floor.json card ids (load_floor) and overrides.json "removedCards" (load_removed).
+    The previous feed's own index.json is always enforced."""
     b = read_bundle(bundle_dir)
     bm = b["manifest"]
     build_stamp = bm["tcgcsvBuild"]
@@ -258,6 +357,10 @@ def build_feed(bundle_dir, out_dir, previous, history_retention=365, daily_reten
     if prev_manifest is None:
         log("no previous feed: bootstrapping (history starts at %s)" % date)
     check_not_regressing(prev_manifest, build_stamp, index_obj, prices_obj, b["prices"], allow_shrink)
+    problem = missing_cards_problem(required_cards(previous.index(), floor, removed), index_obj)
+    if problem:
+        raise PublishError(problem)
+    seeds = [(d, blob) for d, blob in seeds if d < date]
 
     # history/<setId>.json
     set_ids = [s["id"] for s in index_obj.get("sets", [])]
@@ -270,17 +373,22 @@ def build_feed(bundle_dir, out_dir, previous, history_retention=365, daily_reten
         raise PublishError("previous feed has %d history files but only %d were found for today's sets; "
                            "pass --allow-shrink if intended" % (prev_sets, len(prev_history)))
     today = history.snapshot_values_by_set(index_obj, prices_obj)
+    seed_values = [(d, history.snapshot_values_by_set(index_obj, json.loads(blob))) for d, blob in seeds]
     files = {}  # relative path -> bytes
     statuses = {}
     hist_from, hist_days = None, 0
     for sid in set_ids:
         values = today.get(sid, {})
         prev = prev_history.get(sid) or history.empty_history(sid, index_obj.get("subTypes", []))
-        if not values and not prev.get("s"):
+        if not values and not prev.get("s") and not any(sv.get(sid) for _, sv in seed_values):
             continue
         h, status = history.append_column(prev, date, values, history_retention)
-        h["setId"] = sid
         statuses[status] = statuses.get(status, 0) + 1
+        for d, sv in seed_values:
+            h, seed_status = history.insert_column(h, d, sv.get(sid, {}), history_retention)
+            key = "seed %s %s" % (d, seed_status)
+            statuses[key] = statuses.get(key, 0) + 1
+        h["setId"] = sid
         if not h["s"]:
             continue
         files[HISTORY_TEMPLATE.format(setId=sid)] = bundle.dumps_compact(h)
@@ -289,12 +397,16 @@ def build_feed(bundle_dir, out_dir, previous, history_retention=365, daily_reten
             hist_from = h["dates"][0]
     n_history = len(files)
 
-    # daily/<date>.json: today's market snapshot plus the retained previous days
+    # daily/<date>.json: today's market snapshot plus the retained previous days (and seeds)
     prev_dates = list(((prev_manifest or {}).get("daily") or {}).get("dates") or [])
-    dates = sorted(set(d for d in prev_dates if d < date) | {date})[-daily_retention:]
+    seed_blobs = dict(seeds)
+    dates = sorted(set(d for d in prev_dates if d < date) | set(seed_blobs) | {date})[-daily_retention:]
     kept = []
     for d in dates:
-        blob = b["pricesMarket"] if d == date else previous.daily(d)
+        if d == date:
+            blob = b["pricesMarket"]
+        else:
+            blob = (previous.daily(d) if d in prev_dates else None) or seed_blobs.get(d)
         if blob is None:
             log("warning: daily/%s.json listed in the previous manifest but missing; dropped" % d)
             continue
@@ -387,6 +499,46 @@ def print_summary(summary):
           % ("TOTAL", t["files"], bundle.human(t["raw"]), bundle.human(t["gzip"])))
 
 
+# ---- floor ---------------------------------------------------------------------
+
+def _natural(local_id):
+    """"2" before "10", "SV9" before "SV10"."""
+    return [int(t) if i % 2 else t for i, t in enumerate(re.split(r"(\d+)", local_id))]
+
+
+def add_to_floor(index_paths, label, path=CATALOG_FLOOR):
+    """Union the cards of ``index_paths`` into catalog-floor.json (never removes).
+    Returns (cards before, cards after)."""
+    doc = _load_json_file(path) if os.path.isfile(path) else {}
+    sets = {sid: set(lids) for sid, lids in (doc.get("sets") or {}).items()}
+    before = sum(len(v) for v in sets.values())
+    for p in index_paths:
+        for c in _load_json_file(p).get("cards") or []:
+            sets.setdefault(c["s"], set()).add(c["l"])
+    after = sum(len(v) for v in sets.values())
+    sources = list(doc.get("sources") or [])
+    if after > before:
+        sources.append("%s: +%d cards, %s" % (label or ", ".join(index_paths), after - before,
+                                              datetime.date.today().isoformat()))
+    doc = {"_doc": "Every card a shipped Evodex catalog contains (setId -> localIds). publish_feed.py build "
+                   "and validate_feed.py fail when today's index.json lacks one, unless overrides.json "
+                   "\"removedCards\" lists it. Only grows: publish_feed.py floor --add <index.json>.",
+           "sources": sources, "cards": after,
+           "sets": {sid: sorted(sets[sid], key=_natural) for sid in sorted(sets)}}
+    lines = ["{"]
+    for k in ("_doc", "sources", "cards"):
+        lines.append("  %s: %s," % (json.dumps(k), json.dumps(doc[k], ensure_ascii=False)))
+    lines.append('  "sets": {')
+    for i, sid in enumerate(doc["sets"]):
+        comma = "," if i < len(doc["sets"]) - 1 else ""
+        lines.append("    %s: %s%s" % (json.dumps(sid), json.dumps(doc["sets"][sid], ensure_ascii=False), comma))
+    lines.append("  }")
+    lines.append("}")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    return before, after
+
+
 # ---- check -------------------------------------------------------------------
 
 def tcgcsv_last_updated():
@@ -457,7 +609,15 @@ def main(argv=None):
     b.add_argument("--history-retention", type=int, default=365, help="dates kept per history file")
     b.add_argument("--daily-retention", type=int, default=90, help="daily snapshots kept")
     b.add_argument("--allow-shrink", action="store_true",
-                   help="publish even if the catalog or price file shrank sharply")
+                   help="publish even if the catalog or price file shrank sharply (never lets a card disappear)")
+    b.add_argument("--seed-dir", default=SEED_DIR,
+                   help="history seeds folded in when their date is absent (default: history-seed/ next to "
+                        "this file; '' = none)")
+
+    fl = sub.add_parser("floor", help="add every card of index.json files to catalog-floor.json")
+    fl.add_argument("--add", nargs="+", required=True, metavar="INDEX_JSON")
+    fl.add_argument("--label", help='what the index is, e.g. "app 0.3.0 bundle"')
+    fl.add_argument("--floor", default=CATALOG_FLOOR)
 
     c = sub.add_parser("check", help="is a new TCGCSV build available?")
     c.add_argument("--previous", help="previous feed: URL or directory (scripts/state.sh pull prints it); "
@@ -473,8 +633,13 @@ def main(argv=None):
     try:
         if args.cmd == "build":
             summary = build_feed(args.bundle, args.out, previous_state(args),
-                                 args.history_retention, args.daily_retention, args.allow_shrink)
+                                 args.history_retention, args.daily_retention, args.allow_shrink,
+                                 seeds=load_seeds(args.seed_dir), floor=load_floor(), removed=load_removed())
             print_summary(summary)
+            return 0
+        if args.cmd == "floor":
+            before, after = add_to_floor(args.add, args.label, args.floor)
+            print("catalog floor %s: %d -> %d cards" % (args.floor, before, after))
             return 0
         if args.cmd == "check":
             changed, reason, stamp = check(previous_state(args).manifest, args.force,

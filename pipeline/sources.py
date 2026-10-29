@@ -3,8 +3,8 @@
 Caching policy (all under ``cache/``):
 
 TCGdex
-  tcgdex/en/series.json, sets.json      refreshed when older than ``list_ttl``
-  tcgdex/en/sets/<id>.json              refreshed when older than ``list_ttl``
+  tcgdex/en/series.json, sets.json      refreshed when older than ``list_ttl`` (12 h)
+  tcgdex/en/sets/<id>.json              refreshed when older than ``list_ttl`` (12 h)
   tcgdex/en/cards/<id>.json             refreshed when older than ``card_ttl``
 
 TCGCSV (one build per day, stamp from last-updated.txt)
@@ -45,6 +45,10 @@ POKEMON_CATEGORY = 3
 DIGITAL_SERIES = {"tcgp"}
 
 DAY = 24 * 3600
+# TCGdex series / set lists / set details. Shorter than the daily schedule, so every
+# nightly run reads today's lists: with a 1-day TTL a run that starts a few minutes
+# earlier than yesterday's (the cache keeps file times) reused yesterday's lists.
+LIST_TTL = DAY // 2
 
 
 def _q(s):
@@ -61,7 +65,7 @@ def _progress(label, done, total):
 
 
 class TCGdex:
-    def __init__(self, cache_dir, workers=4, min_interval=0.075, list_ttl=DAY,
+    def __init__(self, cache_dir, workers=4, min_interval=0.075, list_ttl=LIST_TTL,
                  card_ttl=14 * DAY, offline=False):
         self.root = os.path.join(cache_dir, "tcgdex", "en")
         self.workers = workers

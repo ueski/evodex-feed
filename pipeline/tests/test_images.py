@@ -1,8 +1,13 @@
 import json
+import os
 import unittest
 
 import bundle
 import images
+import net
+import run
+
+HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def ptcg(id_, number, name, large=True):
@@ -131,13 +136,20 @@ class ThumbnailAndHostTests(unittest.TestCase):
 
     def test_only_pokemontcgio_and_scrydex_are_allowed(self):
         """v0.3 IP decision: TCGplayer's product photos are no longer a source (research.md §3.4)."""
-        self.assertEqual(images.SOURCES, ("ptcgio",))
+        self.assertEqual(images.SOURCES, ("ptcgio", "scrydex"))
+        self.assertEqual(images.ALLOWED_HOSTS, ("images.pokemontcg.io", "images.scrydex.com"))
         self.assertTrue(images.allowed("https://images.pokemontcg.io/a/1_hires.png"))
         self.assertTrue(images.allowed("https://images.scrydex.com/pokemon/me55c-58/large"))
         self.assertFalse(images.allowed("https://tcgplayer-cdn.tcgplayer.com/product/1_in_1000x1000.jpg"))
         self.assertFalse(images.allowed("http://images.pokemontcg.io/a/1_hires.png"))
         self.assertFalse(images.allowed(None))
         self.assertFalse(hasattr(images, "tcgplayer_large"))
+
+    def test_a_custom_tcgdex_image_base_stays_on_tcgdex(self):
+        self.assertTrue(images.allowed_tcgdex("https://assets.tcgdex.net/en/xy/xy4/24a"))
+        self.assertFalse(images.allowed_tcgdex("https://images.pokemontcg.io/xy4/24a_hires.png"))
+        self.assertFalse(images.allowed_tcgdex("https://tcgplayer-cdn.tcgplayer.com/product/1_in_1000x1000.jpg"))
+        self.assertFalse(images.allowed_tcgdex("http://assets.tcgdex.net/en/xy/xy4/24a"))
 
 
 class ChooseTests(unittest.TestCase):
@@ -157,6 +169,151 @@ class ChooseTests(unittest.TestCase):
     def test_a_host_off_the_allow_list_is_never_chosen(self):
         self.assertEqual(images.choose([("other", self.TCGP)], {self.TCGP: 200}.get), (None, None))
         self.assertEqual(images.choose([("other", self.TCGP), ("ptcgio", self.A)], {}.get), ("ptcgio", self.A))
+
+
+class McDonaldsMappingTests(unittest.TestCase):
+    """Regression (v0.3.1): every McDonald's Collection pokemontcg.io has maps, with the real overrides.json.
+    Set names and dates as TCGdex and pokemontcg.io list them on 2026-10-29."""
+    DEX = [("2011bw", "McDonald's Collection 2011", "2011-06-17"), ("2012bw", "McDonald's Collection 2012", "2012-06-15"),
+           ("2014xy", "McDonald's Collection 2014", "2014-05-23"), ("2015xy", "McDonald's Collection 2015", "2015-11-27"),
+           ("2016xy", "McDonald's Collection 2016", "2016-08-20"), ("2017sm", "McDonald's Collection 2017", "2017-08-03"),
+           ("2018sm", "McDonald's Collection 2018", "2018-10-19"), ("2019sm", "McDonald's Collection 2019", "2019-10-15"),
+           ("2021swsh", "McDonald's Collection 2021", "2021-02-09"),
+           ("2022swsh", "McDonald's Collection 2022", "2022-08-03"),
+           ("2023sv", "McDonald's Collection 2023", "2023-08-01"), ("2024sv", "McDonald's Collection 2024", "2024-12-04")]
+    PTCG = [("mcd11", "McDonald's Collection 2011", "2011/06/17"), ("mcd12", "McDonald's Collection 2012", "2012/06/15"),
+            ("mcd14", "McDonald's Collection 2014", "2014/05/23"), ("mcd15", "McDonald's Collection 2015", "2015/11/27"),
+            ("mcd16", "McDonald's Collection 2016", "2016/08/19"), ("mcd17", "McDonald's Collection 2017", "2017/11/07"),
+            ("mcd18", "McDonald's Collection 2018", "2018/10/16"), ("mcd19", "McDonald's Collection 2019", "2019/10/15"),
+            ("mcd21", "McDonald's Collection 2021", "2021/02/09"), ("mcd22", "McDonald's Collection 2022", "2022/08/03")]
+
+    def test_every_mcdonalds_set_maps(self):
+        with open(os.path.join(HERE, "overrides.json"), encoding="utf-8") as f:
+            ov = {k: v for k, v in json.load(f)["ptcgioSets"].items() if not k.startswith("_")}
+        got = images.map_sets([{"id": i, "name": n, "releaseDate": d} for i, n, d in self.DEX],
+                              [{"id": i, "name": n, "releaseDate": d} for i, n, d in self.PTCG], ov)
+        want = {"2011bw": "mcd11", "2012bw": "mcd12", "2014xy": "mcd14", "2015xy": "mcd15", "2016xy": "mcd16",
+                "2017sm": "mcd17", "2018sm": "mcd18", "2019sm": "mcd19", "2021swsh": "mcd21", "2022swsh": "mcd22",
+                "2023sv": None, "2024sv": None}      # pokemontcg.io has no 2023 / 2024 set
+        self.assertEqual({k: v[0] for k, v in got.items()}, want)
+
+
+class ScrydexCandidateTests(unittest.TestCase):
+    def test_scrydex_file_of_the_same_pokemontcgio_id_comes_second(self):
+        # images.pokemontcg.io/mcd14/2_hires.png answers 404; Scrydex has the card under the same id
+        self.assertEqual(images.candidates(ptcg("mcd14-2", "2", "Chespin")),
+                         [("ptcgio", "https://images.pokemontcg.io/mcd14/2_hires.png"),
+                          ("scrydex", "https://images.scrydex.com/pokemon/mcd14-2/large")])
+        self.assertEqual(images.scrydex_url({"id": "xyp-XY39"}), "https://images.scrydex.com/pokemon/xyp-XY39/large")
+        self.assertEqual(images.scrydex_url({"id": "ex10-?"}), "https://images.scrydex.com/pokemon/ex10-%3F/large")
+        self.assertIsNone(images.scrydex_url({}))
+
+    def test_no_duplicate_when_the_record_already_points_at_scrydex(self):
+        p = {"id": "me55c-11", "number": "11", "name": "X",
+             "images": {"large": "https://images.scrydex.com/pokemon/me55c-11/large"}}
+        self.assertEqual(images.candidates(p), [("ptcgio", "https://images.scrydex.com/pokemon/me55c-11/large")])
+
+    def test_a_derived_scrydex_url_needs_a_200(self):
+        a, b = "https://images.pokemontcg.io/mcd14/2_hires.png", "https://images.scrydex.com/pokemon/mcd14-2/large"
+        cands = [("ptcgio", a), ("scrydex", b)]
+        self.assertEqual(images.choose(cands, {a: 404, b: 200}.get), ("scrydex", b))
+        self.assertEqual(images.choose(cands, {a: 404}.get), (None, None))          # never checked: not used
+        self.assertEqual(images.choose(cands, {a: 404, b: 404}.get), (None, None))  # placeholder recorded as 404
+        self.assertEqual(images.choose(cands, {}.get), ("ptcgio", a))               # a record's own URL may be unchecked
+
+    def test_placeholder_is_recognised_by_the_probe_etag(self):
+        probe = {"etag": '"cfl2loWl"', "content-length": "186316", "content-type": "image/png"}
+        sig = images.placeholder_signature(probe)
+        self.assertEqual(sig, ("etag", '"cfl2loWl"'))
+        self.assertTrue(images.is_placeholder({"etag": '"cfl2loWl"', "content-length": "186316"}, sig))
+        self.assertFalse(images.is_placeholder({"etag": '"cfw4hl4A"', "content-length": "306615"}, sig))
+        self.assertFalse(images.is_placeholder({"etag": '"cfl2loWl"'}, None))
+        by_size = images.placeholder_signature({"content-length": "186316"})
+        self.assertTrue(images.is_placeholder({"content-length": "186316"}, by_size))
+        self.assertIsNone(images.placeholder_signature({}))
+
+
+class CheckImageUrlsTests(unittest.TestCase):
+    """run.check_image_urls with a fake HEAD: Scrydex's card-back placeholder is a 404, not an image."""
+    PROBE = images.PLACEHOLDER_PROBES["images.scrydex.com"]
+    REAL = "https://images.scrydex.com/pokemon/mcd14-2/large"
+    UNKNOWN = "https://images.scrydex.com/pokemon/hsp-HGSS18/large"
+    PTCG = "https://images.pokemontcg.io/mcd14/2_hires.png"
+
+    def run_check(self, responses):
+        calls = []
+
+        def fake_head(url, limiter=None, retries=3, timeout=30):
+            calls.append(url)
+            return responses[url]
+        original = net.http_head
+        net.http_head = fake_head
+        try:
+            status = {}
+            n = run.check_image_urls([self.REAL, self.UNKNOWN, self.PTCG], status, offline=False, workers=1)
+        finally:
+            net.http_head = original
+        return n, status, calls
+
+    def test_placeholder_becomes_404(self):
+        placeholder = (200, {"etag": '"card-back"', "content-length": "186316"})
+        n, status, calls = self.run_check({self.PROBE: placeholder, self.UNKNOWN: placeholder,
+                                           self.REAL: (200, {"etag": '"chespin"', "content-length": "306615"}),
+                                           self.PTCG: (404, {})})
+        self.assertEqual(n, 3)
+        self.assertEqual(calls[0], self.PROBE)
+        self.assertEqual(status[self.REAL][0], 200)
+        self.assertEqual(status[self.UNKNOWN][0], 404)
+        self.assertEqual(status[self.UNKNOWN][2], "placeholder")
+        self.assertEqual(status[self.PTCG][0], 404)
+
+    def test_failed_probe_leaves_that_host_unchecked(self):
+        n, status, _ = self.run_check({self.PROBE: (503, {}), self.PTCG: (404, {})})
+        self.assertEqual(n, 1)
+        self.assertEqual(set(status), {self.PTCG})
+
+
+class TwinImageTests(unittest.TestCase):
+    TCGDEX = "https://assets.tcgdex.net/en/xy/%s/%s"
+
+    def card(self, cid, name, products, image=None):
+        return {"id": cid, "localId": cid.split("-", 1)[1], "name": name, "image": image, "products": products}
+
+    def test_xya_alternates_take_the_scan_of_their_twin(self):
+        # TCGdex lists the XY "a" alternates twice: xya-24a (no scan) and xy4-24a (scan); one TCGplayer product
+        cards = [self.card("xya-24a", "M Manectric-EX", [131696]),
+                 self.card("xy4-24a", "M Manectric EX", [131696], self.TCGDEX % ("xy4", "24a")),
+                 self.card("xy4-24", "M Manectric EX", [99999], self.TCGDEX % ("xy4", "24")),
+                 self.card("xya-92a", "Trainers’ Mail", [133815, 133816]),
+                 self.card("xy6-92a", "Trainers' Mail", [133815, 133816], self.TCGDEX % ("xy6", "92a"))]
+        self.assertEqual(images.twin_images(cards),
+                         {"xya-24a": (self.TCGDEX % ("xy4", "24a"), "xy4-24a"),
+                          "xya-92a": (self.TCGDEX % ("xy6", "92a"), "xy6-92a")})
+
+    def test_no_twin_without_the_same_product_number_and_name(self):
+        img = self.TCGDEX % ("xy4", "24a")
+        cases = [
+            [self.card("a-24a", "M Manectric-EX", [1]), self.card("b-24a", "M Manectric EX", [2], img)],  # product
+            [self.card("a-24b", "M Manectric-EX", [1]), self.card("b-24a", "M Manectric EX", [1], img)],  # number
+            [self.card("a-24a", "Pikachu", [1]), self.card("b-24a", "M Manectric EX", [1], img)],         # name
+        ]
+        for cards in cases:
+            with self.subTest(cards=cards):
+                self.assertEqual(images.twin_images(cards), {})
+
+    def test_two_equally_good_twins_are_skipped(self):
+        cards = [self.card("a-1", "Pikachu", [1]),
+                 self.card("b-1", "Pikachu", [1], self.TCGDEX % ("b", "1")),
+                 self.card("c-1", "Pikachu", [1], self.TCGDEX % ("c", "1"))]
+        self.assertEqual(images.twin_images(cards), {})
+
+    def test_twin_image_is_written_as_a_custom_i(self):
+        sets = [{"id": "xya", "name": "Yellow A Alternate", "series": "xy", "groups": []}]
+        cards = [{"id": "xya-24a", "setId": "xya", "localId": "24a", "name": "M Manectric-EX",
+                  "image": self.TCGDEX % ("xy4", "24a"), "imageTwin": "xy4-24a", "tcgplayer": None}]
+        idx = bundle.compact_index([{"id": "xy", "name": "XY"}], sets, cards, [])
+        self.assertEqual(idx["cards"][0]["i"], "https://assets.tcgdex.net/en/xy/xy4/24a")
+        self.assertNotIn("im", idx["cards"][0])
 
 
 class BundleFallbackFieldTests(unittest.TestCase):

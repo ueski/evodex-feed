@@ -4,7 +4,7 @@
 # compares TCGCSV's last-updated.txt with the previous feed; on a scheduled run it polls
 # every 15 min for up to 2 h while today's build is late. Same build = nothing to do.
 #
-# State: manifest.json + history/ + daily/ live on the `data` branch (scripts/state.sh,
+# State: manifest.json + index.json + history/ + daily/ live on the `data` branch (scripts/state.sh,
 # README "History and state"). A run reads that state, folds today in, validates the result,
 # pushes the new state and only then deploys. Any failure before that point stops the run:
 # nothing is pushed or deployed, and yesterday's feed stays live.
@@ -116,7 +116,7 @@ jobs:
           # shellcheck disable=SC2086  # SHRINK is one flag or nothing
           python3 pipeline/publish_feed.py build --bundle pipeline/out/bundle --out site --previous "$PREVIOUS" $SHRINK
 
-      - name: Validate (sha256, sizes, 90 % product guard, history carried over)
+      - name: Validate (sha256, sizes, 90 % product guard, no card lost, history carried over)
         if: steps.check.outputs.changed == 'true'
         env:
           PREVIOUS: ${{ steps.state.outputs.previous }}

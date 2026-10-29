@@ -21,7 +21,7 @@ no app code here.
 |---|---|---|
 | Prices (market, low, mid, high, direct low; USD) | **TCGplayer**, via [TCGCSV](https://tcgcsv.com) | TCGCSV mirrors TCGplayer's catalog and prices once a day. The prices are TCGplayer's data. TCGplayer is credited for **prices only**: no TCGplayer images are used. Thank you, TCGCSV. |
 | Cards, sets, numbers, rarities, image URLs | [TCGdex](https://tcgdex.dev) (`api.tcgdex.net`) | Open-source card database. Thank you, TCGdex. |
-| Fallback image URLs (cards TCGdex has no image for) | [pokemontcg.io](https://pokemontcg.io) / Scrydex **only** (`images.pokemontcg.io`, `images.scrydex.com`) | URLs only; no images are stored here. Cards neither TCGdex nor pokemontcg.io has an image for get none. |
+| Fallback image URLs (cards TCGdex has no image for) | A TCGdex scan of the same card listed twice by TCGdex, else [pokemontcg.io](https://pokemontcg.io) / Scrydex **only** (`images.pokemontcg.io`, `images.scrydex.com`) | URLs only; no images are stored here. A card is matched to pokemontcg.io by set, number and name; when pokemontcg.io's file is missing, Scrydex's file of the same card id is used after a check that it is not Scrydex's card-back placeholder. Cards without a verified source get none. |
 | National Dex species per card (`dx`) | [PokéAPI](https://pokeapi.co) static CSV export | Read at most every 30 days from GitHub, never from the REST API. |
 
 **Notice.** Pokémon and all card names, card text, set names, artwork and images are © Nintendo,
@@ -47,12 +47,12 @@ scheduled runs late under load. It can be started by hand at any time (`workflow
 ## How a run works
 
 ```
-21:15 UTC  scripts/state.sh pull state     data branch → state/ (manifest, history/, daily/)
+21:15 UTC  scripts/state.sh pull state     data branch → state/ (manifest, index, history/, daily/)
            publish_feed.py check           TCGCSV last-updated.txt vs state/manifest.json; same → stop
            run.py                          TCGdex + TCGCSV → pipeline/out/bundle/{index,prices,prices-market,manifest}.json
-           publish_feed.py build           fold today into state/ → site/ (complete site)
+           publish_feed.py build           fold today (and pipeline/history-seed/) into state/ → site/ (complete site)
            validate_feed.py site           sha256, counts, sizes, guards; any problem → stop
-           scripts/state.sh push site      site/{manifest,history,daily} → next commit on the data branch
+           scripts/state.sh push site      site/{manifest,index,history,daily} → next commit on the data branch
            upload-pages-artifact + deploy-pages   atomic replacement of the whole site
 ```
 
@@ -71,19 +71,24 @@ will be uploaded. Either one failing stops the run:
 | `sha256` and byte size of `index.json`, `prices.json`, `prices-market.json` match `manifest.json` | The app verifies the same hash; a mismatch would be rejected on every device. |
 | `prices.json` lists **≥ 90 % of the previous feed's products** | Mirrors the app's own rule (it keeps its old prices below 90 %). Catches a partial TCGCSV outage. |
 | Catalog keeps ≥ 95 % of its cards; `prices.json` keeps ≥ 80 % of its bytes | Partial upstream outage or partial pipeline run. |
+| **Cards are only ever added:** every card of the previous feed's `index.json` and of `pipeline/catalog-floor.json` (every catalog an app version ships with) is still in `index.json`. `allow_shrink` does **not** override this; only `pipeline/overrides.json` `"removedCards"` does | The app replaces its bundled catalog with this `index.json`; a missing card shows "Card not found" for every collection entry that references it. On 2026-10-28 TCGdex served an older set list and 34 of 21,290 cards (0.16 %) went missing, well inside the 95 % guard. |
 | TCGCSV build not older than the previous feed's | Never go back in time. |
 | History carried over: no fewer days, no lost daily snapshots, no lost history files | A run that lost its state would otherwise publish a feed with its history wiped. |
-| First run: ≥ 15,000 cards and ≥ 15,000 products | There is nothing to compare the first day with. |
-| Fallback images (`im` in `index.json`) only on `images.pokemontcg.io` / `images.scrydex.com`; any `tcgplayer-cdn.tcgplayer.com` URL fails the run | TCGplayer images are not used (IP decision); TCGplayer is a price source only. |
+| First run: ≥ 15,000 cards and ≥ 15,000 products, one day of data plus history seeds only | There is nothing to compare the first day with. |
+| Fallback images (`im` in `index.json`) only on `images.pokemontcg.io` / `images.scrydex.com`, custom TCGdex image bases (`i`) only on `assets.tcgdex.net`; any `tcgplayer-cdn.tcgplayer.com` URL fails the run | TCGplayer images are not used (IP decision); TCGplayer is a price source only. |
 | `daily/` and `history/` match the manifest exactly; every series as long as its dates; no file > 100 MB, site < 1 GB | Structural integrity and GitHub Pages limits. |
 
-After checking what changed, a shrink can be accepted once with **Run workflow → allow_shrink**.
+After checking what changed, a shrink can be accepted once with **Run workflow → allow_shrink**. A card that
+disappears cannot: if TCGdex really removed or renamed it, list its id in `pipeline/overrides.json`
+`"removedCards"` with the reason (change it in the app repository's `tools/pipeline/` and copy it here, see
+"Repository layout").
 
 ## History and state
 
 The feed is stateful: `history/<setId>.json` gains one column per day and `daily/` keeps the last
 90 snapshots. That state is kept on this repository's **`data` branch** (only `manifest.json`,
-`history/` and `daily/`). Each run reads the branch, folds today in, validates, commits the new
+`index.json`, `history/` and `daily/`; `index.json` since 2026-10-29, for the "cards are only ever added"
+guard). Each run reads the branch, folds today in, validates, commits the new
 state on top of the branch (fast-forward only) and then deploys the site.
 
 Why a branch, not the live site, as the source of truth:
@@ -102,11 +107,21 @@ publish order (validate → push state → deploy) means a failed deploy leaves 
 ahead of the site, which the next run repairs; it can never lose a day of history.
 
 **First run.** No `data` branch and no live `manifest.json` (404): the run bootstraps. History
-starts on that day; TCGCSV's price archive is offline, so earlier days cannot be back-filled.
+starts on that day; TCGCSV's price archive is offline, so earlier days cannot be back-filled from it.
+
+**History seeds.** `pipeline/history-seed/<YYYY-MM-DD>.json` is a `prices-market.json` of an earlier TCGCSV
+build that we downloaded ourselves. Every build folds it into each history file that lacks that date (at its
+sorted position; a file that has the date keeps its own values) and into `daily/` while the date is within the 90
+newest. Days in between are not invented: the history has 2026-10-21, then 2026-10-28, and the app draws that gap
+dashed. Once the date is on the `data` branch the seed is a no-op. `2026-10-21.json` is the snapshot behind the
+app's bundled prices (TCGCSV build `2026-10-21T20:05:22+0000`), so the charts start a week before the first
+nightly run.
 
 ### Data branch size
 
-Measured locally with 32 simulated days on real data and deliberately heavy price churn (each price
+`index.json` adds about 0.5 MB once (zlib), then small deltas: it only changes when the catalog or the product
+mapping does (it has no timestamps). For the rest,
+measured locally with 32 simulated days on real data and deliberately heavy price churn (each price
 moves on 35 % of days): the branch packed to **10 MB after `git gc`** (about 0.3 MB per day; about
 1.3 MB per day before the server repacks). Expect roughly 100–150 MB per year, well under GitHub's
 1 GB recommendation. Each run fetches only the newest commit (`--depth=1`): 1.5 MB on day 1,
@@ -193,7 +208,10 @@ Rows are `[subTypeIdx, market, low, mid, high, directLow]` in integer US cents (
 ### index.json
 
 The card catalog (sets, cards, numbers, rarities, TCGplayer product ids and printings, image
-URLs, species), in the compact format documented in [`pipeline/bundle.py`](pipeline/bundle.py).
+URLs, species), in the compact format documented in [`pipeline/bundle.py`](pipeline/bundle.py). Images: a card
+without `i` uses TCGdex's standard path; `"i": "<url>"` is another TCGdex image base (a TCGdex twin's scan);
+`"i": 0` plus `"im"` is a complete pokemontcg.io / Scrydex file; `"i": 0` alone means no image. The catalog only
+grows (see "Guards").
 
 ### history/&lt;setId&gt;.json
 
@@ -205,7 +223,8 @@ URLs, species), in the compact format documented in [`pipeline/bundle.py`](pipel
 
 One file per TCGdex set. Series key `"<productId>.<subTypeIdx>"` (index into this file's
 `subTypes`); one market price in cents (or `null`) per date. Re-running a date replaces its column;
-the last 365 dates are kept; all-null series are dropped.
+the last 365 dates are kept; all-null series are dropped. `dates` lists price dates only: a day without a build
+(or before the first run, apart from history seeds) is absent, never interpolated.
 
 ### daily/&lt;YYYY-MM-DD&gt;.json
 
@@ -216,9 +235,11 @@ That day's `prices-market.json`, unchanged, for the last 90 price dates.
 * **TCGCSV:** identifiable User-Agent with this repository's URL, sequential requests 150 ms apart,
   one full sync per daily build (gated by `last-updated.txt`), a few hundred requests a day, well
   under the 10k/day limit. The app never contacts TCGCSV.
-* **TCGdex:** 4 workers, at most ~13 requests/s, set lists cached 1 day and cards 14 days.
+* **TCGdex:** 4 workers, at most ~13 requests/s, set lists cached 12 hours (so every nightly run reads
+  today's lists) and cards 14 days.
 * **pokemontcg.io:** at most 30 requests/minute, 7-day cache, only sets that need a fallback image.
-  **Image CDNs** (pokemontcg.io / Scrydex): one HEAD per new fallback URL, ≤ 10/s per host, results cached.
+  **Image CDNs** (pokemontcg.io / Scrydex): one HEAD per new fallback URL, ≤ 10/s per host, results cached;
+  plus one HEAD of an id Scrydex cannot have, per run that checks Scrydex URLs (its placeholder's ETag).
 * The HTTP cache (`pipeline/cache/`) is kept between runs with `actions/cache`; losing it only
   makes the next run cold (~35 min, ~22k TCGdex requests).
 
@@ -230,7 +251,9 @@ That day's `prices-market.json`, unchanged, for the last 90 price dates.
 | Run now | `gh workflow run price-feed.yml` (add `-f force=true` to rebuild the same TCGCSV build) |
 | Accept a sharp shrink once | `gh workflow run price-feed.yml -f allow_shrink=true` |
 | Undo a bad day | Revert the day's commit on `data` (`git revert`, push), then `gh workflow run price-feed.yml -f force=true` |
-| Fix a set mapping or card name | Edit `pipeline/overrides.json` (format in `pipeline/setmap.py` / `run.py`), run `run.py --offline` and the tests, commit to `main` |
+| Fix a set mapping or card name | Edit `tools/pipeline/overrides.json` in the app repository (format in `setmap.py` / `run.py`), run `run.py --offline` and the tests there, then `python3 tools/pipeline/feed_sync.py copy <this checkout>` and commit here to `main` |
+| Remove a card on purpose | Add `"<cardId>": "<reason>"` to `overrides.json` `"removedCards"` (same route as above); without it the run fails |
+| Add a released app catalog to the floor | In the app repository: `python3 tools/pipeline/publish_feed.py floor --add Binderly/Resources/Data/index.json --label "Evodex X.Y.Z bundle"`, then copy as above |
 | Protect the state | Settings → Rules → Rulesets → new branch ruleset for `data`: block deletion and force pushes (the job only fast-forwards) |
 | Shrink the `data` branch | Rarely needed (see "Data branch size"). Squash it into one commit: `git fetch origin data && git checkout --orphan squash origin/data && git commit -m "Squash state" && git push -f origin squash:data` (lift the force-push rule for that push) |
 | Get told about failures | GitHub e-mails failed scheduled runs to the person who last changed the workflow's `cron`; check Actions → Price feed |
@@ -251,8 +274,14 @@ each scheduled run re-enables the workflow to keep the schedule alive.
 | `pipeline/sources.py`, `net.py` | Fetchers, polite HTTP client and on-disk cache |
 | `pipeline/setmap.py`, `matching.py`, `normalize.py`, `variants.py` | TCGdex set ↔ TCGplayer group mapping and card ↔ product matching |
 | `pipeline/images.py`, `species.py`, `bundle.py` | Fallback images, species, compact JSON encoders |
-| `pipeline/overrides.json` | Hand-maintained mapping fixes |
+| `pipeline/overrides.json` | Hand-maintained mapping fixes; `removedCards` (the only cards allowed to leave the catalog) |
+| `pipeline/catalog-floor.json` | Every card a shipped app catalog contains; `index.json` must always contain them |
+| `pipeline/history-seed/` | One-time history seeds (feed-only; see "History and state") |
 | `pipeline/tests/` | `python3 -m unittest` |
+
+Everything in `pipeline/` except `history-seed/` is a byte-identical copy of the shared files in the Evodex app
+repository's `tools/pipeline/`, which is the source of truth (its `feed_sync.py check` / `copy` lists them). Make
+pipeline changes there and copy them here, so the bundled catalog and the nightly one come from the same code.
 
 ## License
 

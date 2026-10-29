@@ -1,5 +1,5 @@
 {
-  "_doc": "Hand-maintained exceptions for setmap.py / matching.py. 'fallbackGroups' are searched (number+name only) for cards still unmatched after their own set's groups. 'sets' entries replace the automatic set->group mapping (groups are ordered: first = main group used for the card's deep link). 'labels' prefix variant names for cards found in that group. 'include'/'exclude' are case-insensitive substrings filtering the product pool by product name (for groups shared by several TCGdex sets). 'cards' pins individual cards to productIds. 'tcgplayerOnlyGroups' are TCGplayer groups known to have no TCGdex counterpart (reported separately from unexpected misses). 'names' pins a card's English name (applied before normalize.clean_card_name). 'ptcgioSets' replaces the automatic TCGdex set -> pokemontcg.io set mapping used for fallback images (images.py); null means the set is known to have no pokemontcg.io counterpart. 'dex' pins a Pokémon card's National Dex species ids (wins over TCGdex dexId and the name rule in species.py).",
+  "_doc": "Hand-maintained exceptions for setmap.py / matching.py. 'fallbackGroups' are searched (number+name only) for cards still unmatched after their own set's groups. 'sets' entries replace the automatic set->group mapping (groups are ordered: first = main group used for the card's deep link). 'labels' prefix variant names for cards found in that group. 'include'/'exclude' are case-insensitive substrings filtering the product pool by product name (for groups shared by several TCGdex sets). 'cards' pins individual cards to productIds. 'tcgplayerOnlyGroups' are TCGplayer groups known to have no TCGdex counterpart (reported separately from unexpected misses). 'names' pins a card's English name (applied before normalize.clean_card_name). 'ptcgioSets' replaces the automatic TCGdex set -> pokemontcg.io set mapping used for fallback images (images.py); null means the set is known to have no pokemontcg.io counterpart. 'dex' pins a Pokémon card's National Dex species ids (wins over TCGdex dexId and the name rule in species.py). 'symbols' overrides the bundled set symbol (symbols.py, read only by the app repository's build_set_symbols.py; evodex-feed keeps an identical copy of this file): null = none, a set id = that set's symbol. 'removedCards' lists the only card ids allowed to disappear from the published catalog (publish_feed.py / validate_feed.py fail when a card of the previous feed or of catalog-floor.json is missing): card id -> why.",
   "sets": {
     "base1": {"groups": [604, 1663], "labels": {"1663": "Shadowless"},
               "note": "1st Edition and Shadowless printings are the separate group 'Base Set (Shadowless)'"},
@@ -89,6 +89,14 @@
     "tk-dp-l": null, "tk-dp-m": null, "tk-hs-g": null, "tk-hs-r": null, "tk-bw-e": null, "tk-bw-z": null,
     "tk-xy-b": null, "tk-xy-w": null, "tk-xy-latia": null, "tk-xy-latio": null, "tk-xy-n": null,
     "tk-xy-sy": null, "tk-xy-p": null, "tk-xy-su": null, "tk-sm-l": null, "tk-sm-r": null
+  },
+  "removedCards": {
+    "_note": "Card id -> reason. Empty: no card has ever been removed on purpose. A listed card may leave index.json; it stays in catalog-floor.json as a record."
+  },
+  "symbols": {
+    "_note": "Set symbols the app bundles (symbols.py, build_set_symbols.py). null = no symbol; a set id = reuse that set's symbol. Checked by eye on 2026-10-29 against the TCGdex and pokemontcg.io files.",
+    "base1": null, "ex5.5": null,
+    "exu": "ex10", "svp": "swshp", "mep": "swshp"
   },
   "dex": {
     "_note": "Card id -> [National Dex ids]. Not needed on 2026-10-23: the 3 wrong TCGdex dexIds (2021swsh-12, mfb-22, mfb-31) are corrected automatically by the name rule (REPORT 'Species')."

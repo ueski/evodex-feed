@@ -1,7 +1,7 @@
 """Pure normalization helpers shared by set mapping and card matching.
 
 Everything here is deliberately regex-light and table-free so it can be ported
-1:1 to Swift (see data-sources.md in the Evodex app repository, "Matching algorithm").
+1:1 to Swift (see the app repository's docs/architecture/data-sources.md, "Matching algorithm").
 """
 
 import re

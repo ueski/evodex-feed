@@ -20,17 +20,45 @@ TCGdex-only and ships in the app bundle; the app draws the source's TCGdex image
      of the card's own era series. Preferred: the same series (a kit's era series), then the earliest
      release, then the card id.
 
+  3. Curated (v0.3.6, ``same-art-curated.json``, ``load_curated``): reviewed pairs for cards the rules above
+     can't match, mostly trainer-kit reprints for which TCGdex lists no illustrator. Each pair was compared by
+     eye with a public scan of the card itself (the note says which and when); only the illustrator / HP /
+     attack-shape match is waived. Name, category, no chains and the era rule for Trainer and Energy cards still
+     apply, unless an entry says ``"crossEra": true`` (with its own by-eye proof). A curated entry comes first.
+
 No chains: a source has its own TCGdex image (no ``"i": 0``, so no ``im`` and no ``ia``). A TCGplayer
 ``im`` wins over an alias (it is a photo of this very printing); the alias is only for cards with neither.
 ``alias_problems`` is the check publish_feed.py and validate_feed.py run on the published index.json.
 """
 
+import json
+import os
 import re
 
 ERA_SERIES = (("tk-xy-", "xy"), ("tk-sm-", "sm"), ("tk-hs-", "hgss"), ("tk-bw-", "bw"), ("tk-dp-", "dp"))
 ENERGY_ERAS = ("xy", "sm")      # eras whose kits print the main sets' basic Energy (see rule 1)
 BASIC_ENERGY = re.compile(r"(Grass|Fire|Water|Lightning|Psychic|Fighting|Darkness|Metal|Fairy) Energy")
 _NUMBER_RE = re.compile(r"(\d+)")
+CURATED = os.path.join(os.path.dirname(os.path.abspath(__file__)), "same-art-curated.json")
+_CURATED_KEYS = {"source", "note", "crossEra"}
+
+
+def load_curated(path=CURATED):
+    """{cardId: {"source", "note", "crossEra"?}} from same-art-curated.json ({} without the file). Every entry needs a
+    source card id and a note; anything else is an error, so a typo stops the run instead of shipping."""
+    if not path or not os.path.isfile(path):
+        return {}
+    with open(path, encoding="utf-8") as f:
+        doc = json.load(f)
+    entries = doc.get("cards") if isinstance(doc, dict) else None
+    if not isinstance(entries, dict):
+        raise ValueError("%s: expected {\"cards\": {cardId: {source, note}}}" % path)
+    for cid, e in entries.items():
+        if not isinstance(e, dict) or set(e) - _CURATED_KEYS or not isinstance(e.get("source"), str) \
+                or not e["source"] or not isinstance(e.get("note"), str) or not e["note"].strip() \
+                or not isinstance(e.get("crossEra", False), bool) or e["source"] == cid:
+            raise ValueError("%s: bad entry for %s: %r (needs source and note; crossEra true/false)" % (path, cid, e))
+    return entries
 
 
 def era_series(set_id, series):
@@ -67,10 +95,31 @@ def energy_sources(cards, set_meta):
     return {slot: cid for slot, (_, cid) in best.items()}
 
 
-def aliases(cards, set_meta):
+def curated_problem(card, source, set_meta, entry):
+    """Why a curated pair can't be used, or None: the source must exist with its own TCGdex image and the same name
+    and category; a Trainer or Energy source must be of the card's era unless the entry says crossEra."""
+    if source is None:
+        return "source %s is not in the catalog" % entry["source"]
+    if not source.get("ownImage"):
+        return "source %s has no TCGdex image of its own" % entry["source"]
+    if source.get("name") != card.get("name") or source.get("category") != card.get("category"):
+        return "source %s is %r (%s), not %r (%s)" % (entry["source"], source.get("name"), source.get("category"),
+                                                    card.get("name"), card.get("category"))
+    era = era_series(card["setId"], (set_meta.get(card["setId"]) or {}).get("series"))
+    if card.get("category") != "Pokemon" and not entry.get("crossEra") \
+            and (set_meta.get(source["setId"]) or {}).get("series") != era:
+        return "source %s is of another era (needs crossEra with its own proof)" % entry["source"]
+    return None
+
+
+def aliases(cards, set_meta, curated=None, problems=None):
     """cards: [{id, setId, localId, name, category, hp, illustrator, rarity, ownImage (its own TCGdex image),
     needsImage (no image from any source), attackShape}] (the whole catalog); set_meta: {setId: {series,
-    releaseDate}}. Returns {cardId: (sourceId, "energy" | "reprint")} for cards with ``needsImage``."""
+    releaseDate}}; curated: ``load_curated()``. Returns {cardId: (sourceId, "curated" | "energy" | "reprint")}
+    for cards with ``needsImage``. A curated pair that fails ``curated_problem`` is not used; ``problems`` (a dict)
+    collects why, by card id."""
+    curated = curated or {}
+    by_id = {c["id"]: c for c in cards}
     energy = energy_sources(cards, set_meta)
     by_key = {}
     for c in cards:
@@ -83,6 +132,14 @@ def aliases(cards, set_meta):
             continue
         meta = set_meta.get(c["setId"]) or {}
         era = era_series(c["setId"], meta.get("series"))
+        if c["id"] in curated:
+            entry = curated[c["id"]]
+            problem = curated_problem(c, by_id.get(entry["source"]), set_meta, entry)
+            if problem is None:
+                out[c["id"]] = (entry["source"], "curated")
+                continue
+            if problems is not None:
+                problems[c["id"]] = problem
         if c.get("category") == "Energy" and BASIC_ENERGY.fullmatch(c.get("name") or "") and is_kit(c["setId"]):
             source = energy.get((era, c["name"]))
             if source:
@@ -103,10 +160,12 @@ def aliases(cards, set_meta):
     return out
 
 
-def alias_problems(index_obj):
+def alias_problems(index_obj, curated=None):
     """Why index.json's ``ia`` fields can't be published, as messages (empty = fine): every alias is on a card
     with ``"i": 0`` and no ``im``; its source exists, has its own TCGdex image (no ``"i": 0``, so no chain),
-    and has the same name and category; a Trainer or Energy alias stays within its era (``era_series``)."""
+    and has the same name and category; a Trainer or Energy alias stays within its era (``era_series``) unless
+    ``curated`` (``load_curated()``) has this very pair with ``"crossEra": true``."""
+    curated = curated or {}
     cards = index_obj.get("cards") or []
     series = {s.get("id"): s.get("series") for s in index_obj.get("sets") or []}
     by_id = {"%s-%s" % (c.get("s"), c.get("l")): c for c in cards}
@@ -126,7 +185,9 @@ def alias_problems(index_obj):
             bad["source without its own TCGdex image"].append(cid)
         if source.get("n") != c.get("n") or source.get("c") != c.get("c"):
             bad["another name or category"].append(cid)
-        if c.get("c") != "P" and series.get(source.get("s")) != era_series(c.get("s"), series.get(c.get("s"))):
+        waived = (curated.get(cid) or {}).get("crossEra") is True and curated[cid].get("source") == c["ia"]
+        if c.get("c") != "P" and not waived \
+                and series.get(source.get("s")) != era_series(c.get("s"), series.get(c.get("s"))):
             bad["Trainer or Energy from another era"].append(cid)
     return ["%d image alias(es) (ia) %s: %s" % (len(ids), why, ", ".join(ids[:5]) + (" ..." if len(ids) > 5 else ""))
             for why, ids in bad.items() if ids]

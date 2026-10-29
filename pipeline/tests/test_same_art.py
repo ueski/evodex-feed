@@ -1,9 +1,13 @@
+import json
+import os
+import shutil
+import tempfile
 import unittest
 
 import bundle
 import same_art
 
-SETS = {"xy1": {"series": "xy", "releaseDate": "2014-02-05"}, "g1": {"series": "xy", "releaseDate": "2016-02-22"},
+SETS = {"xy1": {"series": "xy", "releaseDate": "2014-02-05"}, "xy0": {"series": "xy", "releaseDate": "2013-11-08"}, "g1": {"series": "xy", "releaseDate": "2016-02-22"},
         "sm1": {"series": "sm", "releaseDate": "2017-02-03"}, "sm2": {"series": "sm", "releaseDate": "2017-05-05"},
         "smp": {"series": "sm", "releaseDate": "2017-02-03"}, "hgss1": {"series": "hgss", "releaseDate": "2010-02-10"},
         "base1": {"series": "base", "releaseDate": "1999-01-09"}, "svp": {"series": "sv", "releaseDate": "2023-01-01"},
@@ -75,6 +79,73 @@ class ReprintTests(unittest.TestCase):
                                                           "tk-sm-r-19": ("sm1-120", "reprint")})
 
 
+class CuratedTests(unittest.TestCase):
+    """v0.3.6 reviewed pairs (same-art-curated.json): only the illustrator / HP / attack-shape match is waived."""
+
+    def cards(self):
+        return [card("xy1-113", "Fletchling", hp=50, illustrator="5ban Graphics", shape=(("", "20"), 0)),
+                card("xy0-19", "Pawniard", hp=60, illustrator="Kouki Saitou"),
+                card("xy1-81", "Pawniard", hp=60, illustrator="Midori Harada"),
+                card("xy0-37", "Potion", "Trainer", illustrator="5ban Graphics"),
+                card("base1-94", "Potion", "Trainer", illustrator="Keiji Kinebuchi"),
+                card("tk-xy-b-1", "Fletchling", hp=50, own=False),
+                card("tk-xy-b-13", "Pawniard", hp=60, own=False),
+                card("tk-xy-b-25", "Potion", "Trainer", own=False),
+                card("tk-xy-b-29", "Potion", "Trainer", own=False)]
+
+    def test_curated_pairs_fill_cards_without_an_illustrator(self):
+        curated = {"tk-xy-b-1": {"source": "xy1-113", "note": "n"}, "tk-xy-b-13": {"source": "xy0-19", "note": "n"},
+                   "tk-xy-b-25": {"source": "xy0-37", "note": "n"}}
+        problems = {}
+        self.assertEqual(same_art.aliases(self.cards(), SETS, curated, problems),
+                         {"tk-xy-b-1": ("xy1-113", "curated"), "tk-xy-b-13": ("xy0-19", "curated"),
+                          "tk-xy-b-25": ("xy0-37", "curated")})
+        self.assertEqual(problems, {})
+
+    def test_name_category_chains_and_era_still_apply(self):
+        cases = {"tk-xy-b-1": {"source": "xy0-19", "note": "n"},              # another name
+                 "tk-xy-b-13": {"source": "tk-xy-b-1", "note": "n"},          # a source without its own image
+                 "tk-xy-b-25": {"source": "base1-94", "note": "n"},           # a Trainer from another era
+                 "tk-xy-b-29": {"source": "xy9-999", "note": "n"}}            # not in the catalog
+        problems = {}
+        self.assertEqual(same_art.aliases(self.cards(), SETS, cases, problems), {})
+        self.assertEqual(sorted(problems), sorted(cases))
+        self.assertIn("another era", problems["tk-xy-b-25"])
+        waived = {"tk-xy-b-25": {"source": "base1-94", "note": "by eye: same art", "crossEra": True}}
+        self.assertEqual(same_art.aliases(self.cards(), SETS, waived), {"tk-xy-b-25": ("base1-94", "curated")})
+
+    def test_a_curated_pair_never_replaces_an_image(self):
+        cards = self.cards()
+        cards[5]["needsImage"] = False   # tk-xy-b-1 got an image of its own
+        self.assertEqual(same_art.aliases(cards, SETS, {"tk-xy-b-1": {"source": "xy1-113", "note": "n"}}), {})
+
+    def test_load_curated(self):
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp)
+        path = os.path.join(tmp, "c.json")
+
+        def write(doc):
+            with open(path, "w") as f:
+                json.dump(doc, f)
+            return path
+        self.assertEqual(same_art.load_curated(os.path.join(tmp, "missing.json")), {})
+        good = {"cards": {"a-1": {"source": "b-1", "note": "by eye", "crossEra": False}}}
+        self.assertEqual(same_art.load_curated(write(good)), good["cards"])
+        for bad in ({"cards": {"a-1": {"source": "b-1"}}}, {"cards": {"a-1": {"source": "", "note": "x"}}},
+                    {"cards": {"a-1": {"source": "a-1", "note": "x"}}},
+                    {"cards": {"a-1": {"source": "b-1", "note": "x", "crossEra": "yes"}}},
+                    {"cards": {"a-1": {"source": "b-1", "note": "x", "url": "https://x"}}}, {"cards": []}, []):
+            with self.assertRaises(ValueError, msg=str(bad)):
+                same_art.load_curated(write(bad))
+
+    def test_the_repository_file_is_valid(self):
+        curated = same_art.load_curated()
+        self.assertGreaterEqual(len(curated), 67)
+        for cid, e in curated.items():
+            self.assertIn("2026-", e["note"], cid)
+            self.assertFalse(e.get("crossEra"), "no cross-era pair so far")
+
+
 class AliasProblemsTests(unittest.TestCase):
     def index(self, cards):
         return {"sets": [{"id": sid, "series": m["series"]} for sid, m in SETS.items()], "cards": cards}
@@ -107,6 +178,13 @@ class AliasProblemsTests(unittest.TestCase):
         for why, cards in cases.items():
             problems = same_art.alias_problems(self.index(cards))
             self.assertTrue(any(why in p for p in problems), (why, problems))
+        cross = [{"s": "base1", "l": "94", "n": "Potion", "c": "T"},
+                 {"s": "tk-xy-b", "l": "25", "n": "Potion", "c": "T", "i": 0, "ia": "base1-94"}]
+        self.assertTrue(any("another era" in p for p in same_art.alias_problems(self.index(cross))))
+        self.assertTrue(any("another era" in p for p in same_art.alias_problems(
+            self.index(cross), {"tk-xy-b-25": {"source": "base1-94", "note": "n"}})), "crossEra must be explicit")
+        self.assertEqual(same_art.alias_problems(
+            self.index(cross), {"tk-xy-b-25": {"source": "base1-94", "note": "n", "crossEra": True}}), [])
         tcgplayer = [{"s": "xy1", "l": "139", "n": "M", "c": "E"},
                      {"s": "tk-xy-b", "l": "2", "n": "M", "c": "E", "i": 0, "im": "https://x", "ia": "xy1-139"}]
         self.assertTrue(any("not on an imageless card" in p for p in same_art.alias_problems(self.index(tcgplayer))))

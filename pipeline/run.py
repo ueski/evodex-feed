@@ -347,15 +347,19 @@ def add_same_art(cards_out, set_meta, card_details, image_report):
                "needsImage": not c.get("image") and not c.get("imageFallback"),
                "attackShape": attack_shape(card_details.get(c["id"]) or {})}
               for c in cards_out]
+    unused = {}
     found = same_art.aliases(briefs, {sid: {"series": m["series"], "releaseDate": m.get("releaseDate")}
-                                      for sid, m in set_meta.items()})
+                                      for sid, m in set_meta.items()}, same_art.load_curated(), unused)
+    for cid, why in sorted(unused.items()):
+        log("  ! same-art-curated.json %s not used: %s" % (cid, why))
     by_id = {c["id"]: c for c in cards_out}
     counts = defaultdict(int)
     for cid, (source, method) in sorted(found.items()):
         by_id[cid]["imageAlias"] = {"source": source, "method": method}
         counts[method] += 1
     total = len(cards_out)
-    image_report["sameArt"] = {"energy": counts["energy"], "reprint": counts["reprint"],
+    image_report["sameArt"] = {"curated": counts["curated"], "energy": counts["energy"], "reprint": counts["reprint"],
+                               "curatedNotUsed": dict(sorted(unused.items())),
                                "aliases": {cid: list(v) for cid, v in sorted(found.items())}}
     image_report["none"] -= len(found)
     image_report["coveredPct"] = pct(total - image_report["none"], total)
@@ -605,8 +609,9 @@ def build(args):
         image_report["withoutTcgdex"], image_report["tcgdexTwin"], image_report["fallback"],
         image_report["none"], "on" if tcgplayer_images else "off", net.STATS))
     add_same_art(cards_out, set_meta, card_details, image_report)
-    log("  same artwork from another printing: energy %d, exact reprint %d; no image at all %d" % (
-        image_report["sameArt"]["energy"], image_report["sameArt"]["reprint"], image_report["none"]))
+    log("  same artwork from another printing: curated %d, energy %d, exact reprint %d; no image at all %d" % (
+        image_report["sameArt"]["curated"], image_report["sameArt"]["energy"], image_report["sameArt"]["reprint"],
+        image_report["none"]))
 
     # ---- species: dx on Pokémon cards + species.json (species.py)
     log("Species ...")
@@ -933,10 +938,11 @@ def render_report(summary, cov, map_report, set_meta):
           im["none"], im["coveredPct"], im["headChecked"], im["rejectedByHead"] or "none",
           im["placeholders"] or "none", len(im["tcgplayerStockEtags"]), im["chosenUnchecked"] or "none"))
     sa = im.get("sameArt") or {}
-    a("Same artwork from another printing (`ia`, same_art.py): basic Energy of the kit's era %d, exact reprint "
-      "%d; the \"none\" count above is after them. Still without any image (%d): %s\n" % (
-          sa.get("energy", 0), sa.get("reprint", 0), len(im.get("noImage") or []),
-          ", ".join(im.get("noImage") or []) or "none"))
+    a("Same artwork from another printing (`ia`, same_art.py): curated %d (same-art-curated.json; not used: %s), "
+      "basic Energy of the kit's era %d, exact reprint %d; the \"none\" count above is after them. Still without any "
+      "image (%d): %s\n" % (
+          sa.get("curated", 0), sa.get("curatedNotUsed") or "none", sa.get("energy", 0), sa.get("reprint", 0),
+          len(im.get("noImage") or []), ", ".join(im.get("noImage") or []) or "none"))
     a("| Set | No TCGdex image | pokemontcg.io set | TCGdex twin | pokemontcg.io | Scrydex | TCGplayer | none |")
     a("|---|---:|---|---:|---:|---:|---:|---:|")
     for sid, r in im["setMap"].items():

@@ -89,11 +89,12 @@ def _json(r, blob, name):
 
 
 def validate(site, previous_manifest=None, allow_shrink=False, min_cards=15000, min_products=15000,
-             required_cards=(), seed_dates=(), tcgplayer_images=False):
+             required_cards=(), seed_dates=(), tcgplayer_images=False, curated=None):
     """Returns (errors, stats). ``previous_manifest`` None = first run (bootstrap).
     ``required_cards``: card ids index.json must contain (publish_feed.required_cards);
     ``seed_dates``: dates of the history seeds (the only days a first run may have besides its own);
-    ``tcgplayer_images``: the images.json switch (images.load_config; None or False = off)."""
+    ``tcgplayer_images``: the images.json switch (images.load_config; None or False = off);
+    ``curated``: same_art.load_curated() (its crossEra pairs may cross the era rule)."""
     r = Report()
     stats = {"sizes": {}}
     mpath = os.path.join(site, "manifest.json")
@@ -162,7 +163,7 @@ def validate(site, previous_manifest=None, allow_shrink=False, min_cards=15000, 
             hosts[host] = hosts.get(host, 0) + 1
         for problem in images.tcgplayer_image_problems(cards_list, switch):
             r.fail("index.json: " + problem)
-        for problem in same_art.alias_problems(index):
+        for problem in same_art.alias_problems(index, curated):
             r.fail("index.json: " + problem)
         stats["imageAliases"] = sum(1 for c in cards_list if "ia" in c)
         off_list = [u for u in ims if not images.allowed(u) and not images.is_tcgplayer_host(u)]
@@ -348,12 +349,13 @@ def main(argv=None):
         required = publish_feed.required_cards(state.index(), publish_feed.load_floor(), publish_feed.load_removed())
         seed_dates = [d for d, _ in publish_feed.load_seeds(args.seed_dir)]
         tcgplayer_images = images.load_config(args.images)
+        curated = same_art.load_curated()
     except (publish_feed.PublishError, net.FetchError, ValueError) as e:
-        sys.stderr.write("[validate_feed] error: cannot read the previous feed, the history seeds or "
-                         "images.json: %s\n" % e)
+        sys.stderr.write("[validate_feed] error: cannot read the previous feed, the history seeds, "
+                         "images.json or same-art-curated.json: %s\n" % e)
         return 1
     errors, stats = validate(args.site, previous, args.allow_shrink, args.min_cards, args.min_products,
-                             required, seed_dates, tcgplayer_images)
+                             required, seed_dates, tcgplayer_images, curated)
     print_stats(stats)
     if errors:
         for e in errors:

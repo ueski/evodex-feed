@@ -337,6 +337,7 @@ each scheduled run re-enables the workflow to keep the schedule alive.
 | `pipeline/sources.py`, `net.py` | Fetchers, polite HTTP client and on-disk cache |
 | `pipeline/setmap.py`, `matching.py`, `normalize.py`, `variants.py` | TCGdex set ↔ TCGplayer group mapping and card ↔ product matching |
 | `pipeline/images.py`, `same_art.py`, `species.py`, `bundle.py` | Fallback images, same artwork from another printing, species, compact JSON encoders |
+| `pipeline/same-art-curated.json` | Reviewed same-artwork pairs (`ia`) for cards the automatic rules can't match, each compared by eye with a scan of the card (see the note in each entry) |
 | `pipeline/overrides.json` | Hand-maintained mapping fixes; `removedCards` (the only cards allowed to leave the catalog) |
 | `pipeline/catalog-floor.json` | Every card a shipped app catalog contains; `index.json` must always contain them |
 | `pipeline/history-seed/` | One-time history seeds (feed-only; see "History and state") |

@@ -76,6 +76,7 @@ will be uploaded. Either one failing stops the run:
 | History carried over: no fewer days, no lost daily snapshots, no lost history files | A run that lost its state would otherwise publish a feed with its history wiped. |
 | First run: ≥ 15,000 cards and ≥ 15,000 products, one day of data plus history seeds only | There is nothing to compare the first day with. |
 | Fallback images (`im` in `index.json`) only on `images.pokemontcg.io` / `images.scrydex.com`, plus `tcgplayer-cdn.tcgplayer.com` **only while `pipeline/images.json` is on**, only on cards without a TCGdex image, only as `…/product/<the card's first product>_in_1000x1000.jpg`; the manifest's `images.tcgplayerFallback` must say what `images.json` says; custom TCGdex image bases (`i`) only on `assets.tcgdex.net` | TCGplayer photos come after TCGdex and pokemontcg.io / Scrydex (client decision 2026-10-29) and sit behind the insurance switch; with it off, a TCGplayer URL fails the run. |
+| Same-artwork aliases (`ia`) only on cards with `"i": 0` and no `im`; the source exists, has its own TCGdex image (no chains) and the same name and category; a Trainer or Energy source is of the card's own era | The app draws the source's scan labelled "Same artwork"; a bad reference would show the wrong card. |
 | `daily/` and `history/` match the manifest exactly; every series as long as its dates; no file > 100 MB, site < 1 GB | Structural integrity and GitHub Pages limits. |
 
 After checking what changed, a shrink can be accepted once with **Run workflow → allow_shrink**. A card that
@@ -216,7 +217,9 @@ The card catalog (sets, cards, numbers, rarities, TCGplayer product ids and prin
 URLs, species), in the compact format documented in [`pipeline/bundle.py`](pipeline/bundle.py). Images: a card
 without `i` uses TCGdex's standard path; `"i": "<url>"` is another TCGdex image base (a TCGdex twin's scan);
 `"i": 0` plus `"im"` is a complete pokemontcg.io / Scrydex file (or, behind the switch, a TCGplayer product
-photo); `"i": 0` alone means no image. The catalog only
+photo); `"i": 0` plus `"ia": "<card id>"` (Evodex 0.3.5+) points at another card of the same file whose own TCGdex
+image shows the same artwork (a trainer kit's basic Energy, an exact reprint; `pipeline/same_art.py`); `"i": 0`
+alone means no image. The catalog only
 grows (see "Guards").
 
 ### history/&lt;setId&gt;.json
@@ -333,7 +336,7 @@ each scheduled run re-enables the workflow to keep the schedule alive.
 | `pipeline/history.py` | History file format and the daily fold (`append_column`) |
 | `pipeline/sources.py`, `net.py` | Fetchers, polite HTTP client and on-disk cache |
 | `pipeline/setmap.py`, `matching.py`, `normalize.py`, `variants.py` | TCGdex set ↔ TCGplayer group mapping and card ↔ product matching |
-| `pipeline/images.py`, `species.py`, `bundle.py` | Fallback images, species, compact JSON encoders |
+| `pipeline/images.py`, `same_art.py`, `species.py`, `bundle.py` | Fallback images, same artwork from another printing, species, compact JSON encoders |
 | `pipeline/overrides.json` | Hand-maintained mapping fixes; `removedCards` (the only cards allowed to leave the catalog) |
 | `pipeline/catalog-floor.json` | Every card a shipped app catalog contains; `index.json` must always contain them |
 | `pipeline/history-seed/` | One-time history seeds (feed-only; see "History and state") |

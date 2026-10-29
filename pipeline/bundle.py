@@ -16,6 +16,7 @@ index.json (bundled, ~read-only catalog)
                  "dx": [nationalDexId, ...]? (Pokémon cards only; see species.py),
                  "i": 0 (no image) | "<full url>" (non-standard path)?,
                  "im": "<absolute image URL>"? (only with "i": 0),
+                 "ia": "<card id>"? (only with "i": 0 and no "im"),
                  "no": "025/165"? (TCGplayer printed number),
                  "p": [{"id": productId, "st": [subTypeIdx...]?, "g": groupLabel?,
                         "q": qualifier?, "gid": groupId?}]?}],
@@ -30,6 +31,9 @@ index.json (bundled, ~read-only catalog)
     ".../large"), NOT a TCGdex base to append "/low.webp" to. Decoders
     that do not know "im" keep showing the placeholder. See images.py and
     docs/architecture/data-sources.md "Fallback images" (Evodex app repository).
+    "ia" (v0.3.5, image alias) names another card of this index whose own TCGdex
+    image shows the same artwork (a kit's basic Energy, an exact reprint;
+    same_art.py); the app draws that card's TCGdex image, labelled. Never a URL.
     "gid" is present only when the product's TCGplayer group differs from its
     set's first group (sets[].groups[0]); otherwise that first group is
     implied. tcgGroups gives the group name / abbreviation (TCGplayer CSV
@@ -139,6 +143,8 @@ def compact_index(series, sets_out, cards_out, subtypes,
             fb = c.get("imageFallback")
             if fb and fb.get("url"):
                 e["im"] = fb["url"]
+            elif (c.get("imageAlias") or {}).get("source"):
+                e["ia"] = c["imageAlias"]["source"]
         elif img != standard_image(image_base, set_series[c["setId"]], c["setId"], c["localId"]):
             e["i"] = img
         tp = c.get("tcgplayer")

@@ -75,6 +75,7 @@ import bundle  # noqa: E402
 import history  # noqa: E402
 import images  # noqa: E402
 import net  # noqa: E402
+import same_art  # noqa: E402
 import sources  # noqa: E402
 
 FEED_VERSION = 1
@@ -455,6 +456,7 @@ def build_feed(bundle_dir, out_dir, previous, history_retention=365, daily_reten
     if problem:
         raise PublishError(problem)
     problems = images.tcgplayer_image_problems(index_obj.get("cards") or [], bool(tcgplayer_images))
+    problems += same_art.alias_problems(index_obj)
     if problems:
         raise PublishError("; ".join(problems))
     seeds = [(d, blob) for d, blob in seeds if d < date]

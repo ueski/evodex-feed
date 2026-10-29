@@ -14,8 +14,9 @@ The pipeline lives in two repositories with identical files: the Evodex app
 Steps: TCGdex catalog -> name fixes -> TCGCSV groups/products/prices -> set
 mapping -> card matching -> variants + prices -> validation against TCGdex's
 own TCGplayer ids -> fallback images (TCGplayer photos last, only while
-images.json switches them on) -> species (dx, species.json) -> coverage report
--> bundle/price files + sizes -> history.
+images.json switches them on) -> same artwork from another printing (ia,
+same_art.py) -> species (dx, species.json) -> coverage report -> bundle/price
+files + sizes -> history.
 """
 
 import argparse
@@ -40,6 +41,7 @@ import images  # noqa: E402
 import matching  # noqa: E402
 import net  # noqa: E402
 import normalize  # noqa: E402
+import same_art  # noqa: E402
 import setmap  # noqa: E402
 import sources  # noqa: E402
 import species  # noqa: E402
@@ -329,6 +331,40 @@ def add_image_fallbacks(args, overrides, physical, cards_out, tcgplayer=False):
     }
 
 
+def attack_shape(detail):
+    """What two printings of one drawing share in their TCGdex text: the attacks' damage, in order, and the
+    number of abilities (same_art guard; robust to typo and apostrophe differences between printings)."""
+    return (tuple(str(a.get("damage") or "") for a in detail.get("attacks") or []),
+            len(detail.get("abilities") or []))
+
+
+def add_same_art(cards_out, set_meta, card_details, image_report):
+    """Last image step (same_art.py): c["imageAlias"] = {"source", "method"} for cards that still have no image,
+    pointing at another card's own TCGdex scan of the same artwork. Updates ``image_report``."""
+    briefs = [{"id": c["id"], "setId": c["setId"], "localId": c["localId"], "name": c["name"],
+               "category": c.get("category"), "hp": c.get("hp"), "illustrator": c.get("illustrator"),
+               "rarity": c.get("rarity"), "ownImage": bool(c.get("image")) and not c.get("imageTwin"),
+               "needsImage": not c.get("image") and not c.get("imageFallback"),
+               "attackShape": attack_shape(card_details.get(c["id"]) or {})}
+              for c in cards_out]
+    found = same_art.aliases(briefs, {sid: {"series": m["series"], "releaseDate": m.get("releaseDate")}
+                                      for sid, m in set_meta.items()})
+    by_id = {c["id"]: c for c in cards_out}
+    counts = defaultdict(int)
+    for cid, (source, method) in sorted(found.items()):
+        by_id[cid]["imageAlias"] = {"source": source, "method": method}
+        counts[method] += 1
+    total = len(cards_out)
+    image_report["sameArt"] = {"energy": counts["energy"], "reprint": counts["reprint"],
+                               "aliases": {cid: list(v) for cid, v in sorted(found.items())}}
+    image_report["none"] -= len(found)
+    image_report["coveredPct"] = pct(total - image_report["none"], total)
+    still = sorted(c["id"] for c in cards_out
+                   if not c.get("image") and not c.get("imageFallback") and not c.get("imageAlias"))
+    image_report["noImage"] = still
+    return found
+
+
 def add_species(args, overrides, cards_out, set_meta):
     """Sets c["dx"] on every Pokémon card (species.card_species) and returns
     (species.json document, report block for summary.json)."""
@@ -568,6 +604,9 @@ def build(args):
     log("  %d without TCGdex image: TCGdex twin %d, %s, none %d; TCGplayer switch %s  (%s)" % (
         image_report["withoutTcgdex"], image_report["tcgdexTwin"], image_report["fallback"],
         image_report["none"], "on" if tcgplayer_images else "off", net.STATS))
+    add_same_art(cards_out, set_meta, card_details, image_report)
+    log("  same artwork from another printing: energy %d, exact reprint %d; no image at all %d" % (
+        image_report["sameArt"]["energy"], image_report["sameArt"]["reprint"], image_report["none"]))
 
     # ---- species: dx on Pokémon cards + species.json (species.py)
     log("Species ...")
@@ -893,6 +932,11 @@ def render_report(summary, cov, map_report, set_meta):
           im["fallback"]["scrydex"], "on" if im["tcgplayerSwitch"] else "off", im["fallback"]["tcgplayer"],
           im["none"], im["coveredPct"], im["headChecked"], im["rejectedByHead"] or "none",
           im["placeholders"] or "none", len(im["tcgplayerStockEtags"]), im["chosenUnchecked"] or "none"))
+    sa = im.get("sameArt") or {}
+    a("Same artwork from another printing (`ia`, same_art.py): basic Energy of the kit's era %d, exact reprint "
+      "%d; the \"none\" count above is after them. Still without any image (%d): %s\n" % (
+          sa.get("energy", 0), sa.get("reprint", 0), len(im.get("noImage") or []),
+          ", ".join(im.get("noImage") or []) or "none"))
     a("| Set | No TCGdex image | pokemontcg.io set | TCGdex twin | pokemontcg.io | Scrydex | TCGplayer | none |")
     a("|---|---:|---|---:|---:|---:|---:|---:|")
     for sid, r in im["setMap"].items():

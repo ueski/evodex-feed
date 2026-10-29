@@ -19,6 +19,9 @@ It re-reads exactly the bytes that will be uploaded and checks:
   tcgplayer.com; publish_feed.affiliate_template_problem);
 * images (optional, v0.3.4): an object; images.tcgplayerFallback true or false, and the same as
   the switch in images.json (missing file = off; --images);
+* index.json image aliases (``ia``, v0.3.5, same_art.alias_problems): only on cards with ``"i": 0`` and no
+  ``im``; the source card exists, has its own TCGdex image (no chains) and the same name and category; a
+  Trainer or Energy source is of the card's own era;
 * index.json fallback images (``im``): pokemontcg.io / Scrydex hosts, plus TCGplayer product
   photos only while that switch is on, only on cards with ``"i": 0``, only in the exact shape
   https://tcgplayer-cdn.tcgplayer.com/product/<p[0].id>_in_1000x1000.jpg
@@ -52,6 +55,7 @@ import bundle  # noqa: E402
 import images  # noqa: E402
 import net  # noqa: E402
 import publish_feed  # noqa: E402
+import same_art  # noqa: E402
 
 ROOT_FILES = {"manifest.json", "index.json", "prices.json", "prices-market.json", ".nojekyll"}
 MAX_FILE_BYTES = 100 * 1000 * 1000
@@ -158,6 +162,9 @@ def validate(site, previous_manifest=None, allow_shrink=False, min_cards=15000, 
             hosts[host] = hosts.get(host, 0) + 1
         for problem in images.tcgplayer_image_problems(cards_list, switch):
             r.fail("index.json: " + problem)
+        for problem in same_art.alias_problems(index):
+            r.fail("index.json: " + problem)
+        stats["imageAliases"] = sum(1 for c in cards_list if "ia" in c)
         off_list = [u for u in ims if not images.allowed(u) and not images.is_tcgplayer_host(u)]
         r.expect(not off_list, "index.json: %d im URLs off the allow-list %s, e.g. %s"
                  % (len(off_list), list(images.ALLOWED_HOSTS), off_list[:1]))
@@ -306,8 +313,9 @@ def validate(site, previous_manifest=None, allow_shrink=False, min_cards=15000, 
 def print_stats(stats):
     print("validated: %d cards, %d products, %d price rows, history up to %d day(s)"
           % (stats.get("cards", 0), stats.get("products", 0), stats.get("rows", 0), stats.get("historyDays", 0)))
-    print("  fallback images (im) by host: %s; TCGdex twin images (i): %d; cards that must stay: %d"
-          % (stats.get("imageHosts") or "none", stats.get("customImages", 0), stats.get("requiredCards", 0)))
+    print("  fallback images (im) by host: %s; TCGdex twin images (i): %d; same-artwork aliases (ia): %d; "
+          "cards that must stay: %d" % (stats.get("imageHosts") or "none", stats.get("customImages", 0),
+                                         stats.get("imageAliases", 0), stats.get("requiredCards", 0)))
     print("  affiliate links: %s" % ("on, " + stats["affiliate"] if stats.get("affiliate") else "off"))
     print("  TCGplayer images: %s" % ("on, %d card(s)" % (stats.get("imageHosts") or {}).get(
         images.TCGPLAYER_IMAGE_HOST, 0) if stats.get("tcgplayerSwitch") else "off"))

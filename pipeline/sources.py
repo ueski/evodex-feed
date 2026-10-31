@@ -49,6 +49,8 @@ DAY = 24 * 3600
 # nightly run reads today's lists: with a 1-day TTL a run that starts a few minutes
 # earlier than yesterday's (the cache keeps file times) reused yesterday's lists.
 LIST_TTL = DAY // 2
+CATALOG_FLOOR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "catalog-floor.json")
+FLOOR_SNAPSHOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "floor-cards.json")
 
 
 def _q(s):
@@ -133,6 +135,60 @@ class TCGdex:
         card_ids = [c["id"] for s in sets if not s["digital"] for c in s.get("cards", [])]
         cards = self._parallel(self.card, card_ids, "tcgdex cards")
         return series, sets, {k: v for k, v in cards.items() if v is not None}
+
+
+def load_floor_sets(path=CATALOG_FLOOR):
+    """catalog-floor.json's {setId: [localId, ...]}; empty when absent."""
+    if not os.path.isfile(path):
+        return {}
+    with open(path, encoding="utf-8") as f:
+        return json.load(f).get("sets") or {}
+
+
+def load_floor_snapshot(path=FLOOR_SNAPSHOT):
+    """floor-cards.json's {cardId: TCGdex card, without pricing}; empty when absent."""
+    if not os.path.isfile(path):
+        return {}
+    with open(path, encoding="utf-8") as f:
+        return json.load(f).get("cards") or {}
+
+
+def restore_floor_cards(sets, cards, floor, fetch, snapshot):
+    """Put back the cards we already shipped that a set's list lacks.
+
+    TCGdex has served the feed's runner set lists 34 cards short on every run so far (2026-10-28, -30, -31) while
+    answering in full elsewhere; the catalog only grows, so publish_feed.py then refuses the feed. The card
+    itself comes from ``fetch`` (TCGdex by id), else from ``snapshot``. A card found in neither is reported as
+    lost and left out, so the guard still stops the feed. Updates ``sets`` and ``cards``; returns the card ids by
+    where they came from: {"live": [...], "snapshot": [...], "lost": [...]}.
+    """
+    report = {"live": [], "snapshot": [], "lost": []}
+    for s in sets:
+        local_ids = floor.get(s["id"])
+        if s.get("digital") or not local_ids:
+            continue
+        listed = {b["localId"] for b in s.get("cards", [])}
+        missing = [lid for lid in local_ids if lid not in listed]
+        for lid in missing:
+            cid = "%s-%s" % (s["id"], lid)
+            try:
+                card = fetch(cid)
+            except net.FetchError:
+                card = None
+            report["live" if card else "snapshot" if cid in snapshot else "lost"].append(cid)
+            card = card or snapshot.get(cid)
+            if not card:
+                continue
+            cards[cid] = card
+            s.setdefault("cards", []).append({k: card[k] for k in ("id", "localId", "name", "image") if k in card})
+            counts = s.setdefault("cardCount", {})
+            for key, value in ((card.get("set") or {}).get("cardCount") or {}).items():
+                if key in ("official", "total") and value is not None:
+                    counts[key] = max(counts.get(key) or 0, value)
+        if missing:
+            position = {lid: i for i, lid in enumerate(local_ids)}
+            s["cards"].sort(key=lambda b: position.get(b["localId"], len(position)))
+    return report
 
 
 class TCGCSV:

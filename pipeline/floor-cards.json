@@ -1,0 +1,3029 @@
+{
+ "_doc": "TCGdex cards (no pricing) of catalog-floor.json that TCGdex's set lists have left out. Written by floor_snapshot.py; run.py falls back to them, see sources.restore_floor_cards.",
+ "cards": {
+  "30th-B": {
+   "category": "Pokemon",
+   "id": "30th-B",
+   "illustrator": "YOSHIROTTEN",
+   "image": "https://assets.tcgdex.net/en/me/30th/B",
+   "localId": "B",
+   "name": "Mew",
+   "rarity": "RGB Rare",
+   "set": {
+    "cardCount": {
+     "official": 128,
+     "total": 161
+    },
+    "id": "30th",
+    "name": "30th Celebration"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "thirdParty": {
+      "cardmarket": 909511,
+      "tcgplayer": 717609
+     },
+     "variantId": "jr7oetx1mqug9",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:07:32.801Z",
+       "unit": "EUR",
+       "idProduct": 909511,
+       "avg": 2787,
+       "low": 1990,
+       "trend": 2180.28,
+       "avg1": 2450,
+       "avg7": 2554.9,
+       "avg30": 2579,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "dexId": [
+    151
+   ],
+   "hp": 60,
+   "types": [
+    "Psychic"
+   ],
+   "description": "So rare that it is still said to be a mirage by many experts. Only a few people have seen it worldwide.",
+   "stage": "Basic",
+   "attacks": [
+    {
+     "cost": [
+      "Psychic",
+      "Psychic"
+     ],
+     "name": "Psychic",
+     "effect": "This attack does 40 more damage for each Energy attached to your opponent's Active Pokémon.",
+     "damage": "10+"
+    }
+   ],
+   "weaknesses": [
+    {
+     "type": "Darkness",
+     "value": "×2"
+    }
+   ],
+   "resistances": [
+    {
+     "type": "Fighting",
+     "value": "-30"
+    }
+   ],
+   "retreat": 1,
+   "regulationMark": "J",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-30T09:39:02+01:00"
+  },
+  "30th-G": {
+   "category": "Pokemon",
+   "id": "30th-G",
+   "illustrator": "YOSHIROTTEN",
+   "image": "https://assets.tcgdex.net/en/me/30th/G",
+   "localId": "G",
+   "name": "Mew",
+   "rarity": "RGB Rare",
+   "set": {
+    "cardCount": {
+     "official": 128,
+     "total": 161
+    },
+    "id": "30th",
+    "name": "30th Celebration"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "thirdParty": {
+      "cardmarket": 909510,
+      "tcgplayer": 717608
+     },
+     "variantId": "jr7oetx1mqug9",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:11:20.049Z",
+       "unit": "EUR",
+       "idProduct": 909510,
+       "avg": 2780.5,
+       "low": 1690,
+       "trend": 2268.2,
+       "avg1": 999.33,
+       "avg7": 2061.83,
+       "avg30": 2111.94,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "dexId": [
+    151
+   ],
+   "hp": 60,
+   "types": [
+    "Psychic"
+   ],
+   "description": "So rare that it is still said to be a mirage by many experts. Only a few people have seen it worldwide.",
+   "stage": "Basic",
+   "attacks": [
+    {
+     "cost": [
+      "Psychic",
+      "Psychic"
+     ],
+     "name": "Psychic",
+     "effect": "This attack does 40 more damage for each Energy attached to your opponent's Active Pokémon.",
+     "damage": "10+"
+    }
+   ],
+   "weaknesses": [
+    {
+     "type": "Darkness",
+     "value": "×2"
+    }
+   ],
+   "resistances": [
+    {
+     "type": "Fighting",
+     "value": "-30"
+    }
+   ],
+   "retreat": 1,
+   "regulationMark": "J",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-30T09:39:02+01:00"
+  },
+  "30th-R": {
+   "category": "Pokemon",
+   "id": "30th-R",
+   "illustrator": "YOSHIROTTEN",
+   "image": "https://assets.tcgdex.net/en/me/30th/R",
+   "localId": "R",
+   "name": "Mew",
+   "rarity": "RGB Rare",
+   "set": {
+    "cardCount": {
+     "official": 128,
+     "total": 161
+    },
+    "id": "30th",
+    "name": "30th Celebration"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "thirdParty": {
+      "cardmarket": 909509,
+      "tcgplayer": 717607
+     },
+     "variantId": "jr7oetx1mqug9",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:11:20.077Z",
+       "unit": "EUR",
+       "idProduct": 909509,
+       "avg": 3125.99,
+       "low": 2000,
+       "trend": 2785.82,
+       "avg1": 3750,
+       "avg7": 2994.45,
+       "avg30": 2909.83,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "dexId": [
+    151
+   ],
+   "hp": 60,
+   "types": [
+    "Psychic"
+   ],
+   "description": "So rare that it is still said to be a mirage by many experts. Only a few people have seen it worldwide.",
+   "stage": "Basic",
+   "attacks": [
+    {
+     "cost": [
+      "Psychic",
+      "Psychic"
+     ],
+     "name": "Psychic",
+     "effect": "This attack does 40 more damage for each Energy attached to your opponent's Active Pokémon.",
+     "damage": "10+"
+    }
+   ],
+   "weaknesses": [
+    {
+     "type": "Darkness",
+     "value": "×2"
+    }
+   ],
+   "resistances": [
+    {
+     "type": "Fighting",
+     "value": "-30"
+    }
+   ],
+   "retreat": 1,
+   "regulationMark": "J",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-30T09:39:02+01:00"
+  },
+  "mee-009": {
+   "category": "Energy",
+   "id": "mee-009",
+   "illustrator": "YOSHIROTTEN",
+   "localId": "009",
+   "name": "Basic Grass Energy",
+   "rarity": "Common",
+   "set": {
+    "cardCount": {
+     "official": 16,
+     "total": 16
+    },
+    "id": "mee",
+    "name": "Mega Evolution Energy"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "stamp": [
+      "30th-anniversary"
+     ],
+     "thirdParty": {
+      "cardmarket": 909307,
+      "tcgplayer": 713248
+     },
+     "variantId": "1jz5lzkp5cg8gmrsxmftf0fur0t08j",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:11:20.077Z",
+       "unit": "EUR",
+       "idProduct": 909307,
+       "avg": 0.09,
+       "low": 0.02,
+       "trend": 0.06,
+       "avg1": 0.05,
+       "avg7": 0.08,
+       "avg30": 0.09,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "energyType": "Normal",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-22T07:34:46Z"
+  },
+  "mee-010": {
+   "category": "Energy",
+   "id": "mee-010",
+   "illustrator": "YOSHIROTTEN",
+   "localId": "010",
+   "name": "Basic Fire Energy",
+   "rarity": "Common",
+   "set": {
+    "cardCount": {
+     "official": 16,
+     "total": 16
+    },
+    "id": "mee",
+    "name": "Mega Evolution Energy"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "stamp": [
+      "30th-anniversary"
+     ],
+     "thirdParty": {
+      "cardmarket": 909308,
+      "tcgplayer": 713249
+     },
+     "variantId": "1jz5lzkp5cg8gmrsxmftf0fur0t08j",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:07:32.821Z",
+       "unit": "EUR",
+       "idProduct": 909308,
+       "avg": 0.09,
+       "low": 0.02,
+       "trend": 0.06,
+       "avg1": 0.08,
+       "avg7": 0.07,
+       "avg30": 0.09,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "energyType": "Normal",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-22T07:34:46Z"
+  },
+  "mee-011": {
+   "category": "Energy",
+   "id": "mee-011",
+   "illustrator": "YOSHIROTTEN",
+   "localId": "011",
+   "name": "Basic Water Energy",
+   "rarity": "Common",
+   "set": {
+    "cardCount": {
+     "official": 16,
+     "total": 16
+    },
+    "id": "mee",
+    "name": "Mega Evolution Energy"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "stamp": [
+      "30th-anniversary"
+     ],
+     "thirdParty": {
+      "cardmarket": 909310,
+      "tcgplayer": 713250
+     },
+     "variantId": "1jz5lzkp5cg8gmrsxmftf0fur0t08j",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:07:32.797Z",
+       "unit": "EUR",
+       "idProduct": 909310,
+       "avg": 0.08,
+       "low": 0.02,
+       "trend": 0.07,
+       "avg1": 0.04,
+       "avg7": 0.09,
+       "avg30": 0.08,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "energyType": "Normal",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-22T07:34:46Z"
+  },
+  "mee-012": {
+   "category": "Energy",
+   "id": "mee-012",
+   "illustrator": "YOSHIROTTEN",
+   "localId": "012",
+   "name": "Basic Lightning Energy",
+   "rarity": "Common",
+   "set": {
+    "cardCount": {
+     "official": 16,
+     "total": 16
+    },
+    "id": "mee",
+    "name": "Mega Evolution Energy"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "stamp": [
+      "30th-anniversary"
+     ],
+     "thirdParty": {
+      "cardmarket": 909312,
+      "tcgplayer": 713251
+     },
+     "variantId": "1jz5lzkp5cg8gmrsxmftf0fur0t08j",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:07:32.818Z",
+       "unit": "EUR",
+       "idProduct": 909312,
+       "avg": 0.08,
+       "low": 0.02,
+       "trend": 0.06,
+       "avg1": 0.05,
+       "avg7": 0.07,
+       "avg30": 0.08,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "energyType": "Normal",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-22T07:34:46Z"
+  },
+  "mee-013": {
+   "category": "Energy",
+   "id": "mee-013",
+   "illustrator": "YOSHIROTTEN",
+   "localId": "013",
+   "name": "Basic Psychic Energy",
+   "rarity": "Common",
+   "set": {
+    "cardCount": {
+     "official": 16,
+     "total": 16
+    },
+    "id": "mee",
+    "name": "Mega Evolution Energy"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "stamp": [
+      "30th-anniversary"
+     ],
+     "thirdParty": {
+      "cardmarket": 909313,
+      "tcgplayer": 713252
+     },
+     "variantId": "1jz5lzkp5cg8gmrsxmftf0fur0t08j",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:11:20.058Z",
+       "unit": "EUR",
+       "idProduct": 909313,
+       "avg": 0.08,
+       "low": 0.02,
+       "trend": 0.05,
+       "avg1": 0.05,
+       "avg7": 0.07,
+       "avg30": 0.09,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "energyType": "Normal",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-22T07:34:46Z"
+  },
+  "mee-014": {
+   "category": "Energy",
+   "id": "mee-014",
+   "illustrator": "YOSHIROTTEN",
+   "localId": "014",
+   "name": "Basic Fighting Energy",
+   "rarity": "Common",
+   "set": {
+    "cardCount": {
+     "official": 16,
+     "total": 16
+    },
+    "id": "mee",
+    "name": "Mega Evolution Energy"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "stamp": [
+      "30th-anniversary"
+     ],
+     "thirdParty": {
+      "cardmarket": 909314,
+      "tcgplayer": 713253
+     },
+     "variantId": "1jz5lzkp5cg8gmrsxmftf0fur0t08j",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:07:32.810Z",
+       "unit": "EUR",
+       "idProduct": 909314,
+       "avg": 0.09,
+       "low": 0.02,
+       "trend": 0.07,
+       "avg1": 0.08,
+       "avg7": 0.08,
+       "avg30": 0.09,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "energyType": "Normal",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-22T07:34:46Z"
+  },
+  "mee-015": {
+   "category": "Energy",
+   "id": "mee-015",
+   "illustrator": "YOSHIROTTEN",
+   "localId": "015",
+   "name": "Basic Darkness Energy",
+   "rarity": "Common",
+   "set": {
+    "cardCount": {
+     "official": 16,
+     "total": 16
+    },
+    "id": "mee",
+    "name": "Mega Evolution Energy"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "stamp": [
+      "30th-anniversary"
+     ],
+     "thirdParty": {
+      "cardmarket": 909315,
+      "tcgplayer": 713254
+     },
+     "variantId": "1jz5lzkp5cg8gmrsxmftf0fur0t08j",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:11:20.058Z",
+       "unit": "EUR",
+       "idProduct": 909315,
+       "avg": 0.09,
+       "low": 0.02,
+       "trend": 0.07,
+       "avg1": 0.07,
+       "avg7": 0.08,
+       "avg30": 0.09,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "energyType": "Normal",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-22T07:34:46Z"
+  },
+  "mee-016": {
+   "category": "Energy",
+   "id": "mee-016",
+   "illustrator": "YOSHIROTTEN",
+   "localId": "016",
+   "name": "Basic Metal Energy",
+   "rarity": "Common",
+   "set": {
+    "cardCount": {
+     "official": 16,
+     "total": 16
+    },
+    "id": "mee",
+    "name": "Mega Evolution Energy"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "stamp": [
+      "30th-anniversary"
+     ],
+     "thirdParty": {
+      "cardmarket": 909316,
+      "tcgplayer": 713255
+     },
+     "variantId": "1jz5lzkp5cg8gmrsxmftf0fur0t08j",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:07:32.810Z",
+       "unit": "EUR",
+       "idProduct": 909316,
+       "avg": 0.09,
+       "low": 0.02,
+       "trend": 0.06,
+       "avg1": 0.04,
+       "avg7": 0.08,
+       "avg30": 0.09,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "energyType": "Normal",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-22T07:34:46Z"
+  },
+  "mep-089": {
+   "category": "Pokemon",
+   "id": "mep-089",
+   "illustrator": "5ban Graphics",
+   "localId": "089",
+   "name": "Mega Zeraora ex",
+   "rarity": "Promo",
+   "set": {
+    "cardCount": {
+     "official": 0,
+     "total": 112
+    },
+    "id": "mep",
+    "name": "MEP Black Star Promos"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "thirdParty": {
+      "cardmarket": 903672,
+      "tcgplayer": 710754
+     },
+     "variantId": "jr7oetx1mqug9",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:11:20.058Z",
+       "unit": "EUR",
+       "idProduct": 903672,
+       "avg": 1.04,
+       "low": 0.45,
+       "trend": 0.82,
+       "avg1": 0.7,
+       "avg7": 0.76,
+       "avg30": 1.06,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "dexId": [
+    807
+   ],
+   "hp": 270,
+   "types": [
+    "Lightning"
+   ],
+   "stage": "Basic",
+   "suffix": "ex",
+   "attacks": [
+    {
+     "cost": [
+      "Lightning"
+     ],
+     "name": "Thunderous Fist",
+     "effect": "This attack does 60 damage for each {L} Energy attached to this Pokémon.",
+     "damage": "60×"
+    },
+    {
+     "cost": [
+      "Lightning",
+      "Lightning",
+      "Lightning"
+     ],
+     "name": "Zepto Turn",
+     "effect": "Switch this Pokémon with 1 of your Benched Pokémon.",
+     "damage": 150
+    }
+   ],
+   "weaknesses": [
+    {
+     "type": "Fighting",
+     "value": "x2"
+    }
+   ],
+   "retreat": 1,
+   "regulationMark": "J",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-29T15:17:17+01:00"
+  },
+  "mep-090": {
+   "category": "Pokemon",
+   "id": "mep-090",
+   "illustrator": "5ban Graphics",
+   "localId": "090",
+   "name": "Mega Darkrai ex",
+   "rarity": "Promo",
+   "set": {
+    "cardCount": {
+     "official": 0,
+     "total": 112
+    },
+    "id": "mep",
+    "name": "MEP Black Star Promos"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "thirdParty": {
+      "cardmarket": 903676,
+      "tcgplayer": 710756
+     },
+     "variantId": "jr7oetx1mqug9",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:07:32.797Z",
+       "unit": "EUR",
+       "idProduct": 903676,
+       "avg": 1.2,
+       "low": 0.6,
+       "trend": 1.08,
+       "avg1": 1.01,
+       "avg7": 0.87,
+       "avg30": 1.21,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "dexId": [
+    491
+   ],
+   "hp": 280,
+   "types": [
+    "Darkness"
+   ],
+   "stage": "Basic",
+   "suffix": "ex",
+   "attacks": [
+    {
+     "cost": [
+      "Darkness",
+      "Darkness"
+     ],
+     "name": "Dusk Raid",
+     "effect": "If your Benched Pokémon have any damage counters on them, this attack does 110 more damage.",
+     "damage": "110+"
+    },
+    {
+     "cost": [
+      "Darkness",
+      "Darkness",
+      "Darkness"
+     ],
+     "name": "Abyss Eye",
+     "effect": "If your opponent's Active Pokémon is affected by a Special Condition, it is Knocked Out."
+    }
+   ],
+   "weaknesses": [
+    {
+     "type": "Grass",
+     "value": "x2"
+    }
+   ],
+   "retreat": 2,
+   "regulationMark": "J",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-29T15:17:17+01:00"
+  },
+  "mep-091": {
+   "category": "Pokemon",
+   "id": "mep-091",
+   "illustrator": "5ban Graphics",
+   "localId": "091",
+   "name": "Mega Dragonite ex",
+   "rarity": "Promo",
+   "set": {
+    "cardCount": {
+     "official": 0,
+     "total": 112
+    },
+    "id": "mep",
+    "name": "MEP Black Star Promos"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "thirdParty": {
+      "cardmarket": 903681,
+      "tcgplayer": 710757
+     },
+     "variantId": "jr7oetx1mqug9",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:11:20.058Z",
+       "unit": "EUR",
+       "idProduct": 903681,
+       "avg": 1.7,
+       "low": 0.5,
+       "trend": 1.47,
+       "avg1": 1.24,
+       "avg7": 1.49,
+       "avg30": 1.7,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "dexId": [
+    149
+   ],
+   "hp": 370,
+   "types": [
+    "Dragon"
+   ],
+   "evolveFrom": "Dragonair",
+   "stage": "Stage2",
+   "suffix": "ex",
+   "abilities": [
+    {
+     "type": "Ability",
+     "name": "Sky Transport",
+     "effect": "Once during your turn, you may use this Ability. Switch your Active Pokémon with 1 of your Benched Pokémon."
+    }
+   ],
+   "attacks": [
+    {
+     "cost": [
+      "Water",
+      "Lightning",
+      "Lightning"
+     ],
+     "name": "Ryuno Glide",
+     "effect": "Discard 2 Energy from this Pokémon.",
+     "damage": 330
+    }
+   ],
+   "retreat": 2,
+   "regulationMark": "I",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-29T15:17:17+01:00"
+  },
+  "mep-092": {
+   "category": "Trainer",
+   "id": "mep-092",
+   "illustrator": "Naoki Saito",
+   "localId": "092",
+   "name": "Paradise Resort",
+   "rarity": "Promo",
+   "set": {
+    "cardCount": {
+     "official": 0,
+     "total": 112
+    },
+    "id": "mep",
+    "name": "MEP Black Star Promos"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "thirdParty": {
+      "cardmarket": 903686,
+      "tcgplayer": 714597
+     },
+     "variantId": "jr7oetx1mqug9",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:11:20.058Z",
+       "unit": "EUR",
+       "idProduct": 903686,
+       "avg": 120.97,
+       "low": 35,
+       "trend": 154.47,
+       "avg1": 130,
+       "avg7": 130.46,
+       "avg30": 136.15,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    },
+    {
+     "type": "holo",
+     "size": "standard",
+     "stamp": [
+      "staff"
+     ],
+     "thirdParty": {
+      "tcgplayer": 714598,
+      "cardmarket": 905263
+     },
+     "variantId": "81yyszqt25dphmu2olh",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:11:20.058Z",
+       "unit": "EUR",
+       "idProduct": 905263,
+       "avg": 490,
+       "low": 450,
+       "trend": 490,
+       "avg1": 490,
+       "avg7": 489.99,
+       "avg30": 489.99,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "cameoDexIds": [
+    25,
+    54,
+    185,
+    363,
+    700,
+    737,
+    926,
+    950,
+    999,
+    1018
+   ],
+   "effect": "The Retreat Cost of each Psyduck in play (both yours and your opponent's) is {C} less.",
+   "trainerType": "Stadium",
+   "regulationMark": "J",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-10-05T23:02:00+01:00"
+  },
+  "mep-093": {
+   "category": "Pokemon",
+   "id": "mep-093",
+   "illustrator": "DOM",
+   "localId": "093",
+   "name": "Pikachu",
+   "rarity": "Promo",
+   "set": {
+    "cardCount": {
+     "official": 0,
+     "total": 112
+    },
+    "id": "mep",
+    "name": "MEP Black Star Promos"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "thirdParty": {
+      "cardmarket": 894884,
+      "tcgplayer": 712963
+     },
+     "variantId": "jr7oetx1mqug9",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:11:20.049Z",
+       "unit": "EUR",
+       "idProduct": 894884,
+       "avg": 13.42,
+       "low": 6,
+       "trend": 13.42,
+       "avg1": 12.99,
+       "avg7": 13.79,
+       "avg30": 13.4,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    },
+    {
+     "type": "holo",
+     "size": "standard",
+     "stamp": [
+      "winner"
+     ],
+     "thirdParty": {
+      "cardmarket": 894885,
+      "tcgplayer": 716740
+     },
+     "variantId": "6xp3yys30vgc00tf0xbc",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:11:20.049Z",
+       "unit": "EUR",
+       "idProduct": 894885,
+       "avg": 115.12,
+       "low": 49.95,
+       "trend": 92.08,
+       "avg1": 100,
+       "avg7": 89.06,
+       "avg30": 109.94,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "dexId": [
+    25
+   ],
+   "cameoDexIds": [
+    282
+   ],
+   "hp": 70,
+   "types": [
+    "Lightning"
+   ],
+   "stage": "Basic",
+   "attacks": [
+    {
+     "cost": [
+      "Lightning",
+      "Lightning",
+      "Colorless"
+     ],
+     "name": "Scrappy Spark",
+     "effect": "Flip a coin until you get tails. This attack does 30 more damage for each heads.",
+     "damage": "30+"
+    }
+   ],
+   "weaknesses": [
+    {
+     "type": "Fighting",
+     "value": "x2"
+    }
+   ],
+   "retreat": 1,
+   "regulationMark": "J",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-29T10:35:03+01:00"
+  },
+  "mep-094": {
+   "category": "Pokemon",
+   "id": "mep-094",
+   "illustrator": "yuu",
+   "localId": "094",
+   "name": "Alolan Exeggutor",
+   "rarity": "Promo",
+   "set": {
+    "cardCount": {
+     "official": 0,
+     "total": 112
+    },
+    "id": "mep",
+    "name": "MEP Black Star Promos"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "thirdParty": {
+      "cardmarket": 895609,
+      "tcgplayer": 713262
+     },
+     "variantId": "jr7oetx1mqug9",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:11:20.058Z",
+       "unit": "EUR",
+       "idProduct": 895609,
+       "avg": 0.36,
+       "low": 0.02,
+       "trend": 0.4,
+       "avg1": 0.2,
+       "avg7": 0.36,
+       "avg30": 0.37,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "dexId": [
+    103
+   ],
+   "hp": 150,
+   "types": [
+    "Grass"
+   ],
+   "evolveFrom": "Exeggcute",
+   "stage": "Stage1",
+   "abilities": [
+    {
+     "type": "Ability",
+     "name": "Scale Up",
+     "effect": "If this Pokémon has 6 or more {G} Energy attached, it gets +250 HP."
+    }
+   ],
+   "attacks": [
+    {
+     "cost": [
+      "Grass",
+      "Colorless",
+      "Colorless",
+      "Colorless"
+     ],
+     "name": "Mega Drain",
+     "effect": "Heal 50 damage from this Pokémon.",
+     "damage": 150
+    }
+   ],
+   "weaknesses": [
+    {
+     "type": "Fire",
+     "value": "x2"
+    }
+   ],
+   "retreat": 4,
+   "regulationMark": "J",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-29T15:17:17+01:00"
+  },
+  "mep-095": {
+   "category": "Pokemon",
+   "id": "mep-095",
+   "illustrator": "Taiga Kasai",
+   "localId": "095",
+   "name": "Lucario",
+   "rarity": "Promo",
+   "set": {
+    "cardCount": {
+     "official": 0,
+     "total": 112
+    },
+    "id": "mep",
+    "name": "MEP Black Star Promos"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "thirdParty": {
+      "cardmarket": 895610,
+      "tcgplayer": 713263
+     },
+     "variantId": "jr7oetx1mqug9",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:07:32.810Z",
+       "unit": "EUR",
+       "idProduct": 895610,
+       "avg": 0.51,
+       "low": 0.05,
+       "trend": 0.52,
+       "avg1": 0.31,
+       "avg7": 0.57,
+       "avg30": 0.5,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "dexId": [
+    448
+   ],
+   "hp": 120,
+   "types": [
+    "Fighting"
+   ],
+   "evolveFrom": "Riolu",
+   "stage": "Stage1",
+   "attacks": [
+    {
+     "cost": [
+      "Fighting",
+      "Fighting",
+      "Colorless"
+     ],
+     "name": "Aura Sphere",
+     "effect": "This attack also does 60 damage to 1 of your opponent's Benched Pokémon. (Don't apply Weakness and Resistance for Benched Pokémon.)",
+     "damage": 100
+    }
+   ],
+   "weaknesses": [
+    {
+     "type": "Psychic",
+     "value": "x2"
+    }
+   ],
+   "retreat": 2,
+   "regulationMark": "J",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-29T15:17:17+01:00"
+  },
+  "mep-096": {
+   "category": "Pokemon",
+   "id": "mep-096",
+   "illustrator": "Krgc",
+   "localId": "096",
+   "name": "Moltres",
+   "rarity": "Promo",
+   "set": {
+    "cardCount": {
+     "official": 0,
+     "total": 112
+    },
+    "id": "mep",
+    "name": "MEP Black Star Promos"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "thirdParty": {
+      "cardmarket": 895606,
+      "tcgplayer": 713264
+     },
+     "variantId": "jr7oetx1mqug9",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:07:32.810Z",
+       "unit": "EUR",
+       "idProduct": 895606,
+       "avg": 0.37,
+       "low": 0.02,
+       "trend": 0.26,
+       "avg1": 0.29,
+       "avg7": 0.33,
+       "avg30": 0.36,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "dexId": [
+    146
+   ],
+   "hp": 120,
+   "types": [
+    "Fire"
+   ],
+   "stage": "Basic",
+   "abilities": [
+    {
+     "type": "Ability",
+     "name": "Fiery Flapping",
+     "effect": "Once during your turn, if you have Articuno and Zapdos in play, you may use this Ability. Attach a Basic {R} Energy card from your hand to this Pokémon."
+    }
+   ],
+   "attacks": [
+    {
+     "cost": [
+      "Fire",
+      "Fire",
+      "Colorless"
+     ],
+     "name": "Fire Spin",
+     "effect": "Discard 2 Energy from this Pokémon.",
+     "damage": 130
+    }
+   ],
+   "weaknesses": [
+    {
+     "type": "Water",
+     "value": "x2"
+    }
+   ],
+   "retreat": 1,
+   "regulationMark": "J",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-29T15:17:17+01:00"
+  },
+  "mep-097": {
+   "category": "Pokemon",
+   "id": "mep-097",
+   "illustrator": "Taira Akitsu",
+   "localId": "097",
+   "name": "Articuno",
+   "rarity": "Promo",
+   "set": {
+    "cardCount": {
+     "official": 0,
+     "total": 112
+    },
+    "id": "mep",
+    "name": "MEP Black Star Promos"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "thirdParty": {
+      "cardmarket": 895607,
+      "tcgplayer": 713265
+     },
+     "variantId": "jr7oetx1mqug9",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:07:32.810Z",
+       "unit": "EUR",
+       "idProduct": 895607,
+       "avg": 0.37,
+       "low": 0.02,
+       "trend": 0.29,
+       "avg1": 0.31,
+       "avg7": 0.33,
+       "avg30": 0.36,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "dexId": [
+    144
+   ],
+   "hp": 120,
+   "types": [
+    "Water"
+   ],
+   "stage": "Basic",
+   "abilities": [
+    {
+     "type": "Ability",
+     "name": "Frosty Flapping",
+     "effect": "Once during your turn, if you have Moltres and Zapdos in play, you may use this Ability. Attach a Basic {W} Energy card from your hand to this Pokémon."
+    }
+   ],
+   "attacks": [
+    {
+     "cost": [
+      "Water",
+      "Water",
+      "Colorless"
+     ],
+     "name": "Hail",
+     "effect": "This attack does 30 damage to each of your opponent's Pokémon. (Don't apply Weakness and Resistance for Benched Pokémon.)"
+    }
+   ],
+   "weaknesses": [
+    {
+     "type": "Metal",
+     "value": "x2"
+    }
+   ],
+   "retreat": 1,
+   "regulationMark": "J",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-29T15:17:17+01:00"
+  },
+  "mep-098": {
+   "category": "Pokemon",
+   "id": "mep-098",
+   "illustrator": "SIE NANAHARA",
+   "localId": "098",
+   "name": "Zapdos",
+   "rarity": "Promo",
+   "set": {
+    "cardCount": {
+     "official": 0,
+     "total": 112
+    },
+    "id": "mep",
+    "name": "MEP Black Star Promos"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "thirdParty": {
+      "cardmarket": 895608,
+      "tcgplayer": 713266
+     },
+     "variantId": "jr7oetx1mqug9",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:07:32.821Z",
+       "unit": "EUR",
+       "idProduct": 895608,
+       "avg": 0.37,
+       "low": 0.02,
+       "trend": 0.28,
+       "avg1": 0.32,
+       "avg7": 0.29,
+       "avg30": 0.36,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "dexId": [
+    145
+   ],
+   "hp": 120,
+   "types": [
+    "Lightning"
+   ],
+   "stage": "Basic",
+   "abilities": [
+    {
+     "type": "Ability",
+     "name": "Flash-Pop Flapping",
+     "effect": "Once during your turn, if you have Moltres and Articuno in play, you may use this Ability. Attach a Basic {L} Energy card from your hand to this Pokémon."
+    }
+   ],
+   "attacks": [
+    {
+     "cost": [
+      "Lightning",
+      "Lightning",
+      "Lightning",
+      "Colorless"
+     ],
+     "name": "Thundering Lightning",
+     "effect": "This Pokémon also does 60 damage to itself.",
+     "damage": 210
+    }
+   ],
+   "weaknesses": [
+    {
+     "type": "Fighting",
+     "value": "x2"
+    }
+   ],
+   "retreat": 1,
+   "regulationMark": "J",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-29T15:17:17+01:00"
+  },
+  "mep-099": {
+   "category": "Pokemon",
+   "id": "mep-099",
+   "illustrator": "5ban Graphics",
+   "localId": "099",
+   "name": "Greninja ex",
+   "rarity": "Promo",
+   "set": {
+    "cardCount": {
+     "official": 0,
+     "total": 112
+    },
+    "id": "mep",
+    "name": "MEP Black Star Promos"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "thirdParty": {
+      "cardmarket": 895611,
+      "tcgplayer": 713268
+     },
+     "variantId": "jr7oetx1mqug9",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:11:20.058Z",
+       "unit": "EUR",
+       "idProduct": 895611,
+       "avg": 0.42,
+       "low": 0.02,
+       "trend": 0.37,
+       "avg1": 0.32,
+       "avg7": 0.48,
+       "avg30": 0.42,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    },
+    {
+     "type": "holo",
+     "size": "jumbo",
+     "thirdParty": {
+      "cardmarket": 910855,
+      "tcgplayer": 713269
+     },
+     "variantId": "slwlv6rn87",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:11:20.058Z",
+       "unit": "EUR",
+       "idProduct": 910855,
+       "avg": 0.67,
+       "low": 0.07,
+       "trend": 0.47,
+       "avg1": 0.23,
+       "avg7": 0.58,
+       "avg30": 0.59,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "dexId": [
+    658
+   ],
+   "hp": 300,
+   "types": [
+    "Water"
+   ],
+   "evolveFrom": "Frogadier",
+   "stage": "Stage2",
+   "suffix": "ex",
+   "attacks": [
+    {
+     "cost": [
+      "Water"
+     ],
+     "name": "Stealthy Slash",
+     "effect": "This attack does 30 damage to 1 of your opponent's Pokémon for each damage counter on that Pokémon. (Don't apply Weakness and Resistance for Benched Pokémon.)"
+    },
+    {
+     "cost": [
+      "Water",
+      "Water"
+     ],
+     "name": "Aqua Edge",
+     "damage": 160
+    }
+   ],
+   "weaknesses": [
+    {
+     "type": "Lightning",
+     "value": "x2"
+    }
+   ],
+   "retreat": 1,
+   "regulationMark": "J",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-29T15:17:17+01:00"
+  },
+  "mep-100": {
+   "category": "Pokemon",
+   "id": "mep-100",
+   "illustrator": "5ban Graphics",
+   "localId": "100",
+   "name": "Sylveon ex",
+   "rarity": "Promo",
+   "set": {
+    "cardCount": {
+     "official": 0,
+     "total": 112
+    },
+    "id": "mep",
+    "name": "MEP Black Star Promos"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "thirdParty": {
+      "cardmarket": 895612,
+      "tcgplayer": 713267
+     },
+     "variantId": "jr7oetx1mqug9",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:11:20.049Z",
+       "unit": "EUR",
+       "idProduct": 895612,
+       "avg": 0.43,
+       "low": 0.02,
+       "trend": 0.41,
+       "avg1": 0.36,
+       "avg7": 0.47,
+       "avg30": 0.44,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    },
+    {
+     "type": "holo",
+     "size": "jumbo",
+     "thirdParty": {
+      "cardmarket": 910856,
+      "tcgplayer": 713270
+     },
+     "variantId": "slwlv6rn87",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:11:20.049Z",
+       "unit": "EUR",
+       "idProduct": 910856,
+       "avg": 0.86,
+       "low": 0.02,
+       "trend": 0.61,
+       "avg1": 0.41,
+       "avg7": 0.76,
+       "avg30": 0.77,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "dexId": [
+    700
+   ],
+   "hp": 270,
+   "types": [
+    "Psychic"
+   ],
+   "evolveFrom": "Eevee",
+   "stage": "Stage1",
+   "suffix": "ex",
+   "attacks": [
+    {
+     "cost": [
+      "Psychic",
+      "Colorless",
+      "Colorless"
+     ],
+     "name": "Colorful Harmony",
+     "effect": "This attack does 50 damage for each type of Basic Energy attached to all of your Pokémon.",
+     "damage": "50×"
+    }
+   ],
+   "weaknesses": [
+    {
+     "type": "Metal",
+     "value": "x2"
+    }
+   ],
+   "retreat": 2,
+   "regulationMark": "J",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-29T15:17:17+01:00"
+  },
+  "mep-101": {
+   "category": "Pokemon",
+   "id": "mep-101",
+   "illustrator": "Taiga Kasai",
+   "localId": "101",
+   "name": "Nidorina",
+   "rarity": "Promo",
+   "set": {
+    "cardCount": {
+     "official": 0,
+     "total": 112
+    },
+    "id": "mep",
+    "name": "MEP Black Star Promos"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "thirdParty": {
+      "cardmarket": 895604,
+      "tcgplayer": 713260
+     },
+     "variantId": "jr7oetx1mqug9",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:11:20.058Z",
+       "unit": "EUR",
+       "idProduct": 895604,
+       "avg": 5.24,
+       "low": 1.5,
+       "trend": 4.56,
+       "avg1": 4.67,
+       "avg7": 4.99,
+       "avg30": 5.25,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    },
+    {
+     "type": "holo",
+     "size": "standard",
+     "stamp": [
+      "pokemon-center"
+     ],
+     "thirdParty": {
+      "cardmarket": 895605,
+      "tcgplayer": 713261
+     },
+     "variantId": "23hmnvtwdrrnjw8wxr5005pugcpk",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:11:20.058Z",
+       "unit": "EUR",
+       "idProduct": 895605,
+       "avg": 82.74,
+       "low": 270,
+       "trend": 96.39,
+       "avg1": 120,
+       "avg7": 74,
+       "avg30": 74,
+       "avg-holo": null,
+       "low-holo": null,
+       "trend-holo": 0,
+       "avg1-holo": null,
+       "avg7-holo": null,
+       "avg30-holo": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "dexId": [
+    30
+   ],
+   "hp": 90,
+   "types": [
+    "Darkness"
+   ],
+   "evolveFrom": "Nidoran♀",
+   "stage": "Stage1",
+   "abilities": [
+    {
+     "type": "Ability",
+     "name": "Share Happiness",
+     "effect": "Once during your turn, you may use this Ability. Heal 30 damage from 1 of your Pokémon."
+    }
+   ],
+   "attacks": [
+    {
+     "cost": [
+      "Colorless",
+      "Colorless"
+     ],
+     "name": "Bite",
+     "damage": 30
+    }
+   ],
+   "weaknesses": [
+    {
+     "type": "Fighting",
+     "value": "x2"
+    }
+   ],
+   "retreat": 2,
+   "regulationMark": "J",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-29T15:17:17+01:00"
+  },
+  "mep-102": {
+   "category": "Pokemon",
+   "id": "mep-102",
+   "illustrator": "satoma",
+   "localId": "102",
+   "name": "Victini",
+   "rarity": "Promo",
+   "set": {
+    "cardCount": {
+     "official": 0,
+     "total": 112
+    },
+    "id": "mep",
+    "name": "MEP Black Star Promos"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "thirdParty": {
+      "cardmarket": 895613,
+      "tcgplayer": 713286
+     },
+     "variantId": "jr7oetx1mqug9",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:07:32.818Z",
+       "unit": "EUR",
+       "idProduct": 895613,
+       "avg": null,
+       "low": null,
+       "trend": null,
+       "avg1": null,
+       "avg7": null,
+       "avg30": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "dexId": [
+    494
+   ],
+   "hp": 80,
+   "types": [
+    "Fire"
+   ],
+   "stage": "Basic",
+   "attacks": [
+    {
+     "cost": [
+      "Colorless"
+     ],
+     "name": "Call for Family",
+     "effect": "Search your deck for up to 2 Basic Pokémon and put them onto your Bench. Then, shuffle your deck."
+    },
+    {
+     "cost": [
+      "Fire",
+      "Colorless"
+     ],
+     "name": "V-Flame",
+     "damage": 50
+    }
+   ],
+   "weaknesses": [
+    {
+     "type": "Water",
+     "value": "x2"
+    }
+   ],
+   "retreat": 1,
+   "regulationMark": "J",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-29T15:17:17+01:00"
+  },
+  "mep-103": {
+   "category": "Pokemon",
+   "id": "mep-103",
+   "illustrator": "HACCAN",
+   "localId": "103",
+   "name": "Zeraora",
+   "rarity": "Promo",
+   "set": {
+    "cardCount": {
+     "official": 0,
+     "total": 112
+    },
+    "id": "mep",
+    "name": "MEP Black Star Promos"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "thirdParty": {
+      "cardmarket": 895614,
+      "tcgplayer": 713285
+     },
+     "variantId": "jr7oetx1mqug9",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:07:32.810Z",
+       "unit": "EUR",
+       "idProduct": 895614,
+       "avg": null,
+       "low": null,
+       "trend": null,
+       "avg1": null,
+       "avg7": null,
+       "avg30": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "dexId": [
+    807
+   ],
+   "hp": 110,
+   "types": [
+    "Lightning"
+   ],
+   "stage": "Basic",
+   "attacks": [
+    {
+     "cost": [
+      "Colorless"
+     ],
+     "name": "Rapid Draw",
+     "effect": "Draw a card.",
+     "damage": 20
+    },
+    {
+     "cost": [
+      "Lightning",
+      "Colorless"
+     ],
+     "name": "Electrobullet",
+     "effect": "This attack also does 20 damage to 1 of your opponent's Benched Pokémon. (Don't apply Weakness and Resistance for Benched Pokémon.)",
+     "damage": 50
+    }
+   ],
+   "weaknesses": [
+    {
+     "type": "Fighting",
+     "value": "x2"
+    }
+   ],
+   "retreat": 1,
+   "regulationMark": "J",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-29T15:17:17+01:00"
+  },
+  "mep-104": {
+   "category": "Pokemon",
+   "id": "mep-104",
+   "illustrator": "Nisota Niso",
+   "localId": "104",
+   "name": "Mewtwo",
+   "rarity": "Promo",
+   "set": {
+    "cardCount": {
+     "official": 0,
+     "total": 112
+    },
+    "id": "mep",
+    "name": "MEP Black Star Promos"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "thirdParty": {
+      "cardmarket": 895620,
+      "tcgplayer": 713289
+     },
+     "variantId": "jr7oetx1mqug9",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:07:32.801Z",
+       "unit": "EUR",
+       "idProduct": 895620,
+       "avg": null,
+       "low": null,
+       "trend": null,
+       "avg1": null,
+       "avg7": null,
+       "avg30": null
+      },
+      "tcgplayer": null
+     }
+    },
+    {
+     "type": "holo",
+     "size": "jumbo",
+     "variantId": "slwlv6rn87"
+    }
+   ],
+   "dexId": [
+    150
+   ],
+   "hp": 130,
+   "types": [
+    "Psychic"
+   ],
+   "stage": "Basic",
+   "attacks": [
+    {
+     "cost": [
+      "Psychic"
+     ],
+     "name": "Empower",
+     "effect": "Attach up to 2 Basic Energy cards from your discard pile to 1 of your Pokémon."
+    },
+    {
+     "cost": [
+      "Psychic",
+      "Psychic",
+      "Colorless"
+     ],
+     "name": "Psydrive",
+     "effect": "Discard an Energy from this Pokémon.",
+     "damage": 120
+    }
+   ],
+   "weaknesses": [
+    {
+     "type": "Darkness",
+     "value": "x2"
+    }
+   ],
+   "resistances": [
+    {
+     "type": "Fighting",
+     "value": "-30"
+    }
+   ],
+   "retreat": 2,
+   "regulationMark": "J",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-29T15:17:17+01:00"
+  },
+  "mep-105": {
+   "category": "Pokemon",
+   "id": "mep-105",
+   "illustrator": "Cona Nitanda",
+   "localId": "105",
+   "name": "Mew",
+   "rarity": "Promo",
+   "set": {
+    "cardCount": {
+     "official": 0,
+     "total": 112
+    },
+    "id": "mep",
+    "name": "MEP Black Star Promos"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "thirdParty": {
+      "cardmarket": 895621,
+      "tcgplayer": 713288
+     },
+     "variantId": "jr7oetx1mqug9",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:07:32.821Z",
+       "unit": "EUR",
+       "idProduct": 895621,
+       "avg": null,
+       "low": null,
+       "trend": null,
+       "avg1": null,
+       "avg7": null,
+       "avg30": null
+      },
+      "tcgplayer": null
+     }
+    },
+    {
+     "type": "holo",
+     "size": "jumbo",
+     "variantId": "slwlv6rn87"
+    }
+   ],
+   "dexId": [
+    151
+   ],
+   "hp": 60,
+   "types": [
+    "Psychic"
+   ],
+   "stage": "Basic",
+   "attacks": [
+    {
+     "cost": [
+      "Psychic",
+      "Psychic"
+     ],
+     "name": "Psychic",
+     "effect": "This attack does 40 more damage for each Energy attached to your opponent's Active Pokémon.",
+     "damage": "10+"
+    }
+   ],
+   "weaknesses": [
+    {
+     "type": "Darkness",
+     "value": "x2"
+    }
+   ],
+   "resistances": [
+    {
+     "type": "Fighting",
+     "value": "-30"
+    }
+   ],
+   "retreat": 1,
+   "regulationMark": "J",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-29T15:17:17+01:00"
+  },
+  "mep-106": {
+   "category": "Pokemon",
+   "id": "mep-106",
+   "illustrator": "Ounishi",
+   "localId": "106",
+   "name": "Ditto",
+   "rarity": "Promo",
+   "set": {
+    "cardCount": {
+     "official": 0,
+     "total": 112
+    },
+    "id": "mep",
+    "name": "MEP Black Star Promos"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "thirdParty": {
+      "cardmarket": 895619,
+      "tcgplayer": 713287
+     },
+     "variantId": "jr7oetx1mqug9",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:11:20.058Z",
+       "unit": "EUR",
+       "idProduct": 895619,
+       "avg": null,
+       "low": null,
+       "trend": null,
+       "avg1": null,
+       "avg7": null,
+       "avg30": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "dexId": [
+    132
+   ],
+   "cameoDexIds": [
+    420
+   ],
+   "hp": 70,
+   "types": [
+    "Colorless"
+   ],
+   "stage": "Basic",
+   "attacks": [
+    {
+     "cost": [
+      "Colorless",
+      "Colorless"
+     ],
+     "name": "Surprisingly Transform",
+     "effect": "Flip a coin. If heads, search your deck for a Pokémon and switch it with this Pokémon. Any attached cards, damage counters, Special Conditions, turns in play, and any other effects remain on the new Pokémon. If you switched a Pokémon in this way, put this card into your deck. Then, shuffle your deck."
+    }
+   ],
+   "weaknesses": [
+    {
+     "type": "Fighting",
+     "value": "x2"
+    }
+   ],
+   "retreat": 1,
+   "regulationMark": "J",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-29T15:17:17+01:00"
+  },
+  "mep-107": {
+   "category": "Pokemon",
+   "id": "mep-107",
+   "illustrator": "YOSHIROTTEN",
+   "localId": "107",
+   "name": "Pikachu ex",
+   "rarity": "Promo",
+   "set": {
+    "cardCount": {
+     "official": 0,
+     "total": 112
+    },
+    "id": "mep",
+    "name": "MEP Black Star Promos"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "thirdParty": {
+      "cardmarket": 895615,
+      "tcgplayer": 713257
+     },
+     "variantId": "jr7oetx1mqug9",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:07:32.801Z",
+       "unit": "EUR",
+       "idProduct": 895615,
+       "avg": null,
+       "low": 199,
+       "trend": null,
+       "avg1": null,
+       "avg7": null,
+       "avg30": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "dexId": [
+    25
+   ],
+   "hp": 190,
+   "types": [
+    "Lightning"
+   ],
+   "stage": "Basic",
+   "suffix": "ex",
+   "attacks": [
+    {
+     "cost": [
+      "Colorless"
+     ],
+     "name": "Pika-Pika Parade",
+     "effect": "Search your deck for any number of Basic Pokémon and put them onto your Bench. Then, shuffle your deck."
+    },
+    {
+     "cost": [
+      "Lightning",
+      "Lightning",
+      "Colorless"
+     ],
+     "name": "Thunderbolt",
+     "effect": "Discard all Energy from this Pokémon.",
+     "damage": 200
+    }
+   ],
+   "weaknesses": [
+    {
+     "type": "Fighting",
+     "value": "x2"
+    }
+   ],
+   "retreat": 1,
+   "regulationMark": "J",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-29T15:17:17+01:00"
+  },
+  "mep-108": {
+   "category": "Pokemon",
+   "id": "mep-108",
+   "illustrator": "REND",
+   "localId": "108",
+   "name": "Espeon ex",
+   "rarity": "Promo",
+   "set": {
+    "cardCount": {
+     "official": 0,
+     "total": 112
+    },
+    "id": "mep",
+    "name": "MEP Black Star Promos"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "thirdParty": {
+      "cardmarket": 895616,
+      "tcgplayer": 713258
+     },
+     "variantId": "jr7oetx1mqug9",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:11:20.049Z",
+       "unit": "EUR",
+       "idProduct": 895616,
+       "avg": null,
+       "low": 199,
+       "trend": null,
+       "avg1": null,
+       "avg7": null,
+       "avg30": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "dexId": [
+    196
+   ],
+   "cameoDexIds": [
+    37,
+    38,
+    115,
+    133,
+    151,
+    183,
+    184,
+    337,
+    357,
+    420,
+    421,
+    494,
+    764
+   ],
+   "hp": 260,
+   "types": [
+    "Psychic"
+   ],
+   "evolveFrom": "Eevee",
+   "stage": "Stage1",
+   "suffix": "ex",
+   "attacks": [
+    {
+     "cost": [
+      "Psychic",
+      "Colorless"
+     ],
+     "name": "Solar Beatdown",
+     "effect": "This attack does 30 damage for each of your Pokémon in play.",
+     "damage": "30×"
+    }
+   ],
+   "weaknesses": [
+    {
+     "type": "Darkness",
+     "value": "x2"
+    }
+   ],
+   "resistances": [
+    {
+     "type": "Fighting",
+     "value": "-30"
+    }
+   ],
+   "retreat": 1,
+   "regulationMark": "J",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-29T15:17:17+01:00"
+  },
+  "mep-109": {
+   "category": "Pokemon",
+   "id": "mep-109",
+   "illustrator": "YOSHIROTTEN",
+   "localId": "109",
+   "name": "Pikachu ex",
+   "rarity": "Promo",
+   "set": {
+    "cardCount": {
+     "official": 0,
+     "total": 112
+    },
+    "id": "mep",
+    "name": "MEP Black Star Promos"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "thirdParty": {
+      "cardmarket": 895617,
+      "tcgplayer": 713256
+     },
+     "variantId": "jr7oetx1mqug9",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:11:20.058Z",
+       "unit": "EUR",
+       "idProduct": 895617,
+       "avg": null,
+       "low": 199,
+       "trend": null,
+       "avg1": null,
+       "avg7": null,
+       "avg30": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "dexId": [
+    25
+   ],
+   "hp": 190,
+   "types": [
+    "Lightning"
+   ],
+   "stage": "Basic",
+   "suffix": "ex",
+   "attacks": [
+    {
+     "cost": [
+      "Lightning"
+     ],
+     "name": "Zip-Zap Frenzy",
+     "effect": "You may attach any number of Basic Energy cards from your hand to your Pokémon in any way you like."
+    },
+    {
+     "cost": [
+      "Lightning",
+      "Lightning",
+      "Colorless"
+     ],
+     "name": "Thunder",
+     "effect": "This Pokémon also does 30 damage to itself.",
+     "damage": 200
+    }
+   ],
+   "weaknesses": [
+    {
+     "type": "Fighting",
+     "value": "x2"
+    }
+   ],
+   "retreat": 1,
+   "regulationMark": "J",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-29T15:17:17+01:00"
+  },
+  "mep-110": {
+   "category": "Pokemon",
+   "id": "mep-110",
+   "illustrator": "REND",
+   "localId": "110",
+   "name": "Umbreon ex",
+   "rarity": "Promo",
+   "set": {
+    "cardCount": {
+     "official": 0,
+     "total": 112
+    },
+    "id": "mep",
+    "name": "MEP Black Star Promos"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "thirdParty": {
+      "cardmarket": 895618,
+      "tcgplayer": 713259
+     },
+     "variantId": "jr7oetx1mqug9",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:11:20.049Z",
+       "unit": "EUR",
+       "idProduct": 895618,
+       "avg": null,
+       "low": 199,
+       "trend": null,
+       "avg1": null,
+       "avg7": null,
+       "avg30": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "dexId": [
+    197
+   ],
+   "cameoDexIds": [
+    133,
+    150,
+    198,
+    337,
+    488,
+    570,
+    571,
+    633,
+    634,
+    635,
+    774,
+    807,
+    848,
+    849
+   ],
+   "hp": 270,
+   "types": [
+    "Darkness"
+   ],
+   "evolveFrom": "Eevee",
+   "stage": "Stage1",
+   "suffix": "ex",
+   "attacks": [
+    {
+     "cost": [
+      "Darkness",
+      "Colorless"
+     ],
+     "name": "Lunatic Claw",
+     "effect": "If your opponent's Active Pokémon already has any damage counters on it, this attack does 140 more damage.",
+     "damage": "100+"
+    }
+   ],
+   "weaknesses": [
+    {
+     "type": "Grass",
+     "value": "x2"
+    }
+   ],
+   "retreat": 2,
+   "regulationMark": "J",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-09-29T15:17:17+01:00"
+  },
+  "mep-120": {
+   "category": "Trainer",
+   "id": "mep-120",
+   "illustrator": "Yuu Nishida",
+   "localId": "120",
+   "name": "Celebratory Fanfare",
+   "rarity": "Promo",
+   "set": {
+    "cardCount": {
+     "official": 0,
+     "total": 112
+    },
+    "id": "mep",
+    "name": "MEP Black Star Promos"
+   },
+   "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+   },
+   "variants_detailed": [
+    {
+     "type": "holo",
+     "size": "standard",
+     "stamp": [
+      "ace-trainer"
+     ],
+     "variantId": "3a83wf50tx1wqfqfzx1tg3cwq"
+    },
+    {
+     "type": "holo",
+     "size": "standard",
+     "thirdParty": {
+      "cardmarket": 903004
+     },
+     "variantId": "jr7oetx1mqug9",
+     "pricing": {
+      "cardmarket": {
+       "updated": "2026-10-30T13:07:32.797Z",
+       "unit": "EUR",
+       "idProduct": 903004,
+       "avg": null,
+       "low": null,
+       "trend": null,
+       "avg1": null,
+       "avg7": null,
+       "avg30": null
+      },
+      "tcgplayer": null
+     }
+    }
+   ],
+   "cameoDexIds": [
+    25,
+    52,
+    337,
+    448,
+    492,
+    658
+   ],
+   "effect": "Once during each player's turn, that player may heal 10 damage from each of their Pokémon. If a player healed any damage in this way, their turn ends.",
+   "trainerType": "Stadium",
+   "regulationMark": "J",
+   "legal": {
+    "standard": true,
+    "expanded": true
+   },
+   "updated": "2026-10-05T23:02:00+01:00"
+  }
+ }
+}

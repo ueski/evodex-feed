@@ -432,6 +432,11 @@ def build(args):
                          offline=args.offline)
     series, sets, card_details = dex.fetch_catalog(only)
     log("  %d sets, %d card details  (%s)" % (len(sets), len(card_details), net.STATS))
+    restored = sources.restore_floor_cards(sets, card_details, sources.load_floor_sets(), dex.card,
+                                           sources.load_floor_snapshot())
+    if any(restored.values()):
+        log("  shipped cards the set lists lack: %d from TCGdex by id, %d from floor-cards.json, %d lost %s" % (
+            len(restored["live"]), len(restored["snapshot"]), len(restored["lost"]), restored["lost"][:25]))
     name_fixes = fix_names(sets, card_details,
                            {k: v for k, v in overrides.get("names", {}).items() if not k.startswith("_")})
     log("  names: %d fixed, %d unresolved" % (
